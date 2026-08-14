@@ -74,7 +74,7 @@ export default function MyTeamPage() {
           >
             <p className="text-xs font-bold text-gray-400 uppercase">Team A</p>
             <p className="text-xl font-black text-[#00BFFF] my-1">{teamAList.length}</p>
-            <p className="text-[10px] font-bold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full inline-block">Direct (5%)</p>
+            <p className="text-[10px] font-bold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full inline-block">Direct (10%)</p>
           </button>
 
           {/* Team B Button */}
@@ -136,7 +136,7 @@ export default function MyTeamPage() {
           <div className="space-y-2.5 text-xs text-gray-600 font-semibold">
             <div className="flex justify-between items-center py-1.5 border-b border-gray-50">
               <span>Team A: People who registered via your link</span>
-              <span className="text-[#00BFFF]">5% Payout</span>
+              <span className="text-[#00BFFF]">10% Payout</span>
             </div>
             <div className="flex justify-between items-center py-1.5 border-b border-gray-50">
               <span>Team B: People invited by Team A members</span>
