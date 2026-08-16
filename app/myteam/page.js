@@ -114,11 +114,42 @@ export default function MyTeamPage() {
 
           {getActiveList().length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {getActiveList().map(function(phoneNum) {
+              {getActiveList().map(function(member) {
+                // Safely intercepts whether your list contains flat strings or modern user objects
+                const isObject = member && typeof member === 'object';
+                const phoneNum = isObject ? member.phone : member;
+                
+                // Read and format potential VIP variables safely
+                const rawVip = isObject ? (member.vip || member.vipLevel || '') : '';
+                const vipStr = String(rawVip).toLowerCase().trim();
+
+                let hasVip = false;
+                let vipLabel = "";
+                let vipColorStyle = "";
+
+                if (vipStr === 'vip1' || vipStr === '1') {
+                  hasVip = true;
+                  vipLabel = "vip1";
+                  vipColorStyle = "bg-[#00BFFF] text-white"; // Hot Sky Blue
+                } else if (vipStr === 'vip2' || vipStr === '2') {
+                  hasVip = true;
+                  vipLabel = "vip2";
+                  vipColorStyle = "bg-[#FFD700] text-gray-900"; // Hot Yellow
+                } else if (vipStr === 'vip3' || vipStr === '3') {
+                  hasVip = true;
+                  vipLabel = "vip3";
+                  vipColorStyle = "bg-[#9400D3] text-white"; // Hot Purple
+                }
+
                 return (
-                  /* FIXED: Displays the actual user phone number variable directly */
-                  <div key={phoneNum} className="bg-gray-50 border border-gray-100 text-gray-700 text-xs font-bold py-2.5 px-3 rounded-lg text-center tracking-wider">
-                    📞 {phoneNum}
+                  /* FIXED: Keeps gray box architecture completely untouched, dynamically centers variables */
+                  <div key={phoneNum} className="bg-gray-50 border border-gray-100 text-gray-700 text-xs font-bold py-2.5 px-3 rounded-lg text-center tracking-wider flex items-center justify-center gap-1.5">
+                    <span>📞 {phoneNum}</span>
+                    {hasVip && (
+                      <span className={`text-[9px] px-1 py-0.5 rounded font-black lowercase ${vipColorStyle}`}>
+                        {vipLabel}
+                      </span>
+                    )}
                   </div>
                 )
               })}

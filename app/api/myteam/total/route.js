@@ -14,7 +14,7 @@ const toNum = function(v, f) {
 };
 
 /**
- * GET: Pulls live downlines and adds up all commission entries into one single big total
+ * GET: Pulls live downlines with VIP levels and adds up all commission entries
  */
 export async function GET(request) {
   try {
@@ -46,6 +46,43 @@ export async function GET(request) {
     const cleanListB = cleanListA.length === 0 ? [] : rawListB;
     const cleanListC = (cleanListA.length === 0 || cleanListB.length === 0) ? [] : rawListC;
 
+    // --- NEW: FETCH VIP LEVELS FOR ALL TEAM MEMBERS IN BULK ---
+    // Gather all unique phone numbers from your active teams
+    const allMembers = [...cleanListA, ...cleanListB, ...cleanListC];
+    const vipMap = {};
+
+    if (allMembers.length > 0) {
+      // Use an Upstash Redis pipeline to fetch all VIP data in a single round-trip
+      const pipeline = redis.pipeline();
+      allMembers.forEach(function(memberPhone) {
+        // Looks up the master profile data hash where user data is kept
+        pipeline.hget('user:' + memberPhone, 'vip');
+      });
+      
+      const pipelineResults = await pipeline.exec();
+      
+      // Map the array results back to their matching phone numbers
+      allMembers.forEach(function(memberPhone, index) {
+        const vipValue = pipelineResults[index];
+        vipMap[memberPhone] = vipValue ? String(vipValue).toLowerCase().trim() : '';
+      });
+    }
+
+    // Convert flat phone arrays into structured objects containing both phone numbers and VIP level labels
+    const formatTeamList = function(phoneArray) {
+      return phoneArray.map(function(memberPhone) {
+        return {
+          phone: memberPhone,
+          vip: vipMap[memberPhone] || '' // returns 'vip1', 'vip2', 'vip3', etc.
+        };
+      });
+    };
+
+    const finalResultListA = formatTeamList(cleanListA);
+    const finalResultListB = formatTeamList(cleanListB);
+    const finalResultListC = formatTeamList(cleanListC);
+    // ----------------------------------------------------------
+
     // 2. Read user transactions exclusively from the master history key path
     const historyKey = `tx:${cleanPhone}:history`;
     const rawHistory = await redis.lrange(historyKey, 0, -1) || [];
@@ -66,7 +103,6 @@ export async function GET(request) {
       const txType = String(tx.type || '').toLowerCase().trim();
       const txNote = String(tx.note || '').toLowerCase().trim();
       
-      // Strict matching for any entries labeled or typed as commission across your features
       if (
         txLabel === 'commission' ||
         txLabel.includes('commission') ||
@@ -77,7 +113,6 @@ export async function GET(request) {
         txType === 'team_c_payout' ||
         txNote.includes('commission')
       ) {
-        // Forces numbers to be positive with Math.abs so they always add upward cleanly
         return sum + Math.abs(toNum(tx.amount, 0));
       }
       return sum;
@@ -93,9 +128,9 @@ export async function GET(request) {
         teamB: cleanListB.length, 
         teamC: cleanListC.length
       },
-      listA: cleanListA, 
-      listB: cleanListB, 
-      listC: cleanListC  
+      listA: finalResultListA, // Now returns arrays of objects containing VIP levels
+      listB: finalResultListB, 
+      listC: finalResultListC  
     }, { status: 200 });
 
   } catch (error) {
