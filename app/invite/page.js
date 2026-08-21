@@ -181,7 +181,7 @@ export default function InvitePage() {
       {/* 4. TEAM SALARY SYSTEM CONDITIONS DISCLOSURE PANEL */}
       <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px', marginBottom: '20px' }}>
         <p style={{ margin: '0 0 6px 0', fontSize: '10.5px', color: '#1E293B', fontWeight: '700', lineHeight: '1.4' }}>
-          <span style={{ color: '#FF4500', fontWeight: '900' }}>Note:</span> Each employee to qualify for the monthly salary must have only 30% of vip level 1 on his A level.
+          <span style={{ color: '#FF4500', fontWeight: '900' }}>Note:</span> Each employee to qualify for the monthly salary must have only 30% of vip level 1 on his ABC TEAM.
         </p>
         <p style={{ margin: 0, fontSize: '11px', color: '#00BFFF', fontWeight: '800' }}>
           ℹ️ Salary is paid every month on 10th.
