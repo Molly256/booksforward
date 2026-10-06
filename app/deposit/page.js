@@ -5,16 +5,21 @@ import { useRouter } from 'next/navigation'
 export default function Deposit() {
   const router = useRouter()
   const [user, setUser] = useState(null)
-  const [selectedNetwork, setSelectedNetwork] = useState(null) // null = show cards, 'MTN' / 'AIRTEL' = show form
+  const [selectedNetwork, setSelectedNetwork] = useState(null)
   const [amount, setAmount] = useState('')
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [toast, setToast] = useState(null)
 
-  // NEW DETAILS YOU ASKED - SAME FOR BOTH
   const paymentDetails = {
     MTN: { number: '0769306151', name: 'BETTY ANYAIT' },
     AIRTEL: { number: '0769306151', name: 'BETTY ANYAIT' }
+  }
+
+  const showToast = (message, type = 'error') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
   }
 
   useEffect(() => {
@@ -38,18 +43,17 @@ export default function Deposit() {
     const amt = Number(amount)
 
     if (!amt || amt < 50000) {
-      alert('Minimum deposit is 50,000 UGX')
+      showToast('Minimum deposit is 50,000 UGX')
       return
     }
     if (!file) {
-      alert('Please upload transaction proof')
+      showToast('Please upload transaction proof')
       return
     }
 
     setLoading(true)
 
     try {
-      // SAME LOGIC AS BEFORE - creates pending transaction for admin panel
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,17 +68,17 @@ export default function Deposit() {
       const data = await res.json()
 
       if (!res.ok) {
-        alert(data.error || 'Failed to submit')
+        showToast(data.error || 'Failed to submit')
         setLoading(false)
         return
       }
 
-      alert('Deposit request submitted. Wait for admin approval.')
-      router.push('/transactions')
+      showToast('Deposit request submitted. Wait for approval.', 'success')
+      setTimeout(() => router.push('/transactions'), 800)
 
     } catch (err) {
       console.error('Deposit error:', err)
-      alert('Something went wrong')
+      showToast('Something went wrong')
       setLoading(false)
     }
   }
@@ -82,8 +86,30 @@ export default function Deposit() {
   if (!user) return <div className="p-4 text-black">Loading...</div>
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* HEADER - HOT GREEN + WHITE BACK ARROW */}
+    <div className="min-h-screen bg-white flex flex-col relative">
+      {/* BLACK TOAST */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: toast.type === 'success'? '#00c853' : '#111111',
+          color: '#fff',
+          padding: '12px 20px',
+          borderRadius: '25px',
+          fontSize: '13px',
+          fontWeight: '700',
+          zIndex: 9999,
+          boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+          maxWidth: '90%',
+          textAlign: 'center',
+          animation: 'slideDown 0.3s ease'
+        }}>
+          {toast.message}
+        </div>
+      )}
+
       <div className="bg-[#00c853] text-white py-4 px-4 flex items-center gap-3 shadow-md">
         <button
           onClick={() => selectedNetwork? setSelectedNetwork(null) : router.back()}
@@ -97,8 +123,6 @@ export default function Deposit() {
       </div>
 
       <div className="p-5 flex flex-col items-center">
-
-        {/* STEP 1: SELECT NETWORK - SHOW ATM CARD + 2 CARDS */}
         {!selectedNetwork && (
           <>
             <div className="w-full max-w-[340px] bg-[#00c853] rounded-[20px] p-6 shadow-[0_8px_20px_rgba(0,200,83,0.3)] mt-2">
@@ -138,7 +162,6 @@ export default function Deposit() {
           </>
         )}
 
-        {/* STEP 2: AFTER CLICK CARD - SHOW FORM IN SAME PAGE */}
         {selectedNetwork && (
           <div className="w-full max-w-[400px]">
             <div className="bg-[#f9f9f9] rounded-xl p-5 border border-gray-100">
@@ -149,7 +172,10 @@ export default function Deposit() {
                   <p className="text-[13px] text-gray-500 font-bold">Number:</p>
                   <p className="text-[16px] font-black text-black mt-1">{paymentDetails[selectedNetwork].number}</p>
                 </div>
-                <button onClick={() => navigator.clipboard.writeText(paymentDetails[selectedNetwork].number)} className="bg-black text-white text-[11px] px-3 py-1.5 rounded-full font-bold">COPY</button>
+                <button onClick={() => {
+                  navigator.clipboard.writeText(paymentDetails[selectedNetwork].number)
+                  showToast('Number copied!', 'success')
+                }} className="bg-black text-white text-[11px] px-3 py-1.5 rounded-full font-bold">COPY</button>
               </div>
             </div>
 
@@ -181,7 +207,6 @@ export default function Deposit() {
               </label>
             </div>
 
-            {/* CHANGED FROM PAYMENT DONE TO SUBMIT TRANSACTION - HOT GREEN BLACK TEXT */}
             <button
               onClick={handleDeposit}
               disabled={loading}
@@ -196,6 +221,13 @@ export default function Deposit() {
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes slideDown {
+          from { transform: translate(-50%, -100%); opacity: 0; }
+          to { transform: translate(-50%, 0); opacity: 1; }
+        }
+      `}</style>
     </div>
   )
 }

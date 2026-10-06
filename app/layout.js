@@ -18,9 +18,9 @@ export default function RootLayout({ children }) {
         <link rel="manifest" href="/manifest.json" />
         <link rel="shortcut icon" type="image/png" href="/booksforward-icon-192.png" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="theme-color" content="#00BFFF" />
+        <meta name="theme-color" content="#00c853" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <title>BooksForward</title>
         <meta name="description" content="BooksForward - Read and Earn" />
         <meta property="og:title" content="BooksForward" />
@@ -32,12 +32,12 @@ export default function RootLayout({ children }) {
         padding: 0, 
         paddingBottom: shouldHideNav ? '0px' : '75px', 
         minHeight: '100dvh',   
-        background: '#fff',
+        background: '#ffffff',
         boxSizing: 'border-box'
       }}>
         <SWRegister />
         
-        <main style={{ width: '100%', maxWidth: '480px', margin: '0 auto' }}>
+        <main style={{ width: '100%', maxWidth: '480px', margin: '0 auto', background: '#ffffff' }}>
           {children}
         </main>
         

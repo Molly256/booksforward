@@ -2,6 +2,14 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
+export const VIPS = {
+  0: { name: 'Vip0', price: 0, books: 5, perBook: 400, daily: 2000, days: 1 },
+  1: { name: 'Vip1', price: 50000, books: 5, perBook: 400, daily: 2000, days: 365 },
+  2: { name: 'Vip2', price: 230000, books: 10, perBook: 810, daily: 8100, days: 365 },
+  3: { name: 'Vip3', price: 650000, books: 15, perBook: 1466, daily: 22000, days: 365 },
+  4: { name: 'Vip4', price: 850000, books: 20, perBook: 1150, daily: 23000, days: 365 },
+}
+
 const getTodayDateStrFullYear = () => {
   const d = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" }));
   const yyyy = String(d.getFullYear());
@@ -28,9 +36,9 @@ const Toast = ({ msg, onClose }) => {
   }, [onClose]);
   return (
     <div style={{
-      position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-      background: '#000', color: '#fff', padding: '14px 22px', borderRadius: '12px',
-      fontWeight: '900', fontSize: '15px', zIndex: 2000, boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+      position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
+      background: '#000', color: '#fff', padding: '12px 20px', borderRadius: '25px',
+      fontWeight: '700', fontSize: '13px', zIndex: 2000
     }}>
       {msg}
     </div>
@@ -144,79 +152,111 @@ export default function VipLevels() {
 
   if (!user) return null
   const currentVipLevel = Number(user.vip || 0)
+  const HOT_GREEN = '#00c853'
+  const thStyle = { padding: '8px 3px', fontSize: '9.5px', fontWeight: '600', background: HOT_GREEN, border: '1px solid #000', color: '#000', textAlign: 'center' }
+  const tdStyle = { padding: '7px 3px', fontSize: '9.5px', fontWeight: '400', border: '1px solid #000', color: '#000', textAlign: 'center', background: '#fff' }
 
   return (
-    <main style={{ minHeight: '100vh', background: '#FFFFFF', padding: '20px', paddingBottom: '90px' }}>
+    <main style={{ minHeight: '100vh', background: '#FFFFFF', padding: '0', paddingBottom: '90px' }}>
       {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '30px' }}>
-        <Link href="/dashboard" style={{ fontSize: '16px', color: '#FF4F00', fontWeight: '900', textDecoration: 'none' }}>
-          ← Back
-        </Link>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ margin: 0, fontWeight: '900', color: '#000', fontSize: '14px' }}>
-            Balance: {user.availableBalance?.toLocaleString() || 0} UGX
-          </p>
-          <p style={{ margin: '2px 0 0', fontSize: '13px', fontWeight: '700', color: '#000' }}>
-            {vips.find(v => v.level === currentVipLevel)?.name || 'Vip0'}
-          </p>
-        </div>
+      {/* HOT GREEN HEADER - VIP LEVELS - GREEN BACK BUTTON - BALANCE REMOVED */}
+      <div style={{ background: HOT_GREEN, padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <Link href="/dashboard" style={{ width: '36px', height: '36px', background: '#FFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HOT_GREEN, fontSize: '20px', fontWeight: '900', textDecoration: 'none' }}>←</Link>
+        <h1 style={{ color: '#FFF', fontSize: '15px', fontWeight: '900', letterSpacing: '1px' }}>VIP LEVELS</h1>
       </div>
 
-      <h2 style={{ fontSize: '22px', fontWeight: '900', marginBottom: '22px', color: '#000', textAlign: 'center', letterSpacing: '1px' }}>VIP LEVELS</h2>
+      <div style={{ padding: '12px', maxWidth: '500px', margin: '0 auto' }}>
+        {/* SUB HEADER INCOME TABLE BLACK */}
+        <h2 style={{ fontSize: '13px', fontWeight: '900', color: '#000', margin: '12px 0 4px' }}>INCOME TABLE</h2>
+        <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>6 days a week Mon-Sat</p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '420px', margin: '0 auto' }}>
-        {vips.map(vip => {
-          const isCurrent = currentVipLevel === vip.level
-          const isOwned = currentVipLevel >= vip.level
-          const canBuy = vip.level > currentVipLevel
+        {/* INCOME TABLE FROM VIPS CONSTANT - HOT GREEN HEADER + BLACK LIGHT TEXT */}
+        <div style={{ width: '100%', overflowX: 'auto', marginBottom: '28px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{...thStyle, width: '10%'}}>VIP</th>
+                <th style={{...thStyle, width: '14%'}}>Price</th>
+                <th style={{...thStyle, width: '9%'}}>Tasks</th>
+                <th style={{...thStyle, width: '9%'}}>Each</th>
+                <th style={{...thStyle, width: '12%'}}>Daily</th>
+                <th style={{...thStyle, width: '14%'}}>Weekly</th>
+                <th style={{...thStyle, width: '14%'}}>Monthly</th>
+                <th style={{...thStyle, width: '18%'}}>Per Year</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[0,1,2,3,4].map(lvl => {
+                const v = VIPS[lvl]
+                const isVip0 = lvl === 0
+                return (
+                  <tr key={lvl}>
+                    <td style={tdStyle}>V{lvl}</td>
+                    <td style={tdStyle}>{v.price.toLocaleString()}</td>
+                    <td style={tdStyle}>{v.books}</td>
+                    <td style={tdStyle}>{v.perBook.toLocaleString()}</td>
+                    <td style={tdStyle}>{v.daily.toLocaleString()}</td>
+                    <td style={tdStyle}>{isVip0 ? '-' : (v.daily * 6).toLocaleString()}</td>
+                    <td style={tdStyle}>{isVip0 ? '-' : (v.daily * 26).toLocaleString()}</td>
+                    <td style={tdStyle}>{isVip0 ? '-' : (v.daily * 312).toLocaleString()}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
 
-          return (
-            <div key={vip.level} style={{
-              background: '#fff',
-              border: '1px solid #f0f0f0',
-              borderRadius: '16px',
-              padding: '14px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-            }}>
-              <VipBadge color={vip.color} label={`VIP${vip.level}`} textColor={vip.textColor} />
-
-              <div style={{ marginLeft: '16px', flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <span style={{ fontWeight: 900, fontSize: '16px', color: '#111' }}>{vip.name}</span>
-                  <span style={{ fontWeight: 800, fontSize: '15px', color: '#111' }}>{vip.price.toLocaleString()} UGX</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '420px', margin: '0 auto' }}>
+          {vips.map(vip => {
+            const isCurrent = currentVipLevel === vip.level
+            const isOwned = currentVipLevel >= vip.level
+            const canBuy = vip.level > currentVipLevel
+            return (
+              <div key={vip.level} style={{
+                background: '#fff',
+                border: '1px solid #f0f0f0',
+                borderRadius: '16px',
+                padding: '14px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+              }}>
+                <VipBadge color={vip.color} label={`VIP${vip.level}`} textColor={vip.textColor} />
+                <div style={{ marginLeft: '16px', flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <span style={{ fontWeight: 900, fontSize: '16px', color: '#111' }}>{vip.name}</span>
+                    <span style={{ fontWeight: 800, fontSize: '15px', color: '#111' }}>{vip.price.toLocaleString()} UGX</span>
+                  </div>
+                  {canBuy ? (
+                    <button
+                      onClick={() => handleBuyVip(vip)}
+                      disabled={loading}
+                      style={{
+                        width: '100%',
+                        background: vip.color,
+                        color: vip.textColor,
+                        border: 'none',
+                        borderRadius: '10px',
+                        padding: '11px 0',
+                        fontWeight: '900',
+                        fontSize: '14px',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        boxShadow: `0 4px 12px ${vip.color}55`,
+                      }}
+                    >
+                      UPGRADE
+                    </button>
+                  ) : isCurrent ? (
+                    <div style={{ width: '100%', background: '#f2f2f2', borderRadius: '10px', padding: '11px 0', fontWeight: '900', fontSize: '14px', textAlign: 'center' }}>✅ CURRENT</div>
+                  ) : (
+                    <div style={{ width: '100%', background: '#f2f2f2', borderRadius: '10px', padding: '11px 0', fontWeight: '900', fontSize: '14px', textAlign: 'center' }}>Owned</div>
+                  )}
                 </div>
-
-                {canBuy ? (
-                  <button
-                    onClick={() => handleBuyVip(vip)}
-                    disabled={loading}
-                    style={{
-                      width: '100%',
-                      background: vip.color,
-                      color: vip.textColor,
-                      border: 'none',
-                      borderRadius: '10px',
-                      padding: '11px 0',
-                      fontWeight: '900',
-                      fontSize: '14px',
-                      cursor: loading ? 'not-allowed' : 'pointer',
-                      boxShadow: `0 4px 12px ${vip.color}55`,
-                    }}
-                  >
-                    UPGRADE
-                  </button>
-                ) : isCurrent ? (
-                  <div style={{ width: '100%', background: '#f2f2f2', borderRadius: '10px', padding: '11px 0', fontWeight: '900', fontSize: '14px', textAlign: 'center' }}>✅ CURRENT</div>
-                ) : (
-                  <div style={{ width: '100%', background: '#f2f2f2', borderRadius: '10px', padding: '11px 0', fontWeight: '900', fontSize: '14px', textAlign: 'center' }}>Owned</div>
-                )}
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
     </main>
   )

@@ -5,11 +5,17 @@ import { useRouter } from 'next/navigation'
 export default function Login() {
   const router = useRouter()
   const lockRef = useRef(false) 
+  const [toast, setToast] = useState(null)
 
   const [form, setForm] = useState({ phone: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
 
   const HOT_GREEN = '#00C853'
+
+  const showToast = (message, type = 'error') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   const handlePhoneChange = (val) => {
     const cleaned = val.replace(/\D/g, '').slice(0, 10)
@@ -22,12 +28,12 @@ export default function Login() {
     lockRef.current = true
 
     if (!/^07\d{8}$/.test(form.phone)) {
-      alert('Phone must start with 07 and be 10 digits')
+      showToast('Phone must start with 07 and be 10 digits')
       lockRef.current = false
       return
     }
     if (!form.password) {
-      alert('Enter your password')
+      showToast('Enter your password')
       lockRef.current = false
       return
     }
@@ -46,26 +52,29 @@ export default function Login() {
       const data = await res.json()
 
       if (!res.ok) {
-        alert(data.error || 'Authentication failed')
+        showToast(data.error || 'Authentication failed')
         lockRef.current = false 
         return
       }
 
       if (data && data.user) {
         localStorage.setItem('booksforward_user', JSON.stringify(data.user))
-        if (data.user.isAdmin) {
-          router.push('/admin')
-        } else {
-          router.push('/dashboard')
-        }
+        showToast('Login successful!', 'success')
+        setTimeout(() => {
+          if (data.user.isAdmin) {
+            router.push('/admin')
+          } else {
+            router.push('/dashboard')
+          }
+        }, 600)
       } else {
-        alert('Server returned an incomplete user session. Please try again.')
+        showToast('Server returned incomplete session. Try again.')
         lockRef.current = false
       }
       
     } catch (err) {
       console.error('Login submit error:', err)
-      alert('Something went wrong. Check connection and try again.')
+      showToast('Something went wrong. Check connection.')
       lockRef.current = false 
     }
   }
@@ -84,7 +93,31 @@ export default function Login() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+    <div style={{ minHeight: '100vh', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative' }}>
+      
+      {/* BLACK TOAST */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: toast.type === 'success' ? HOT_GREEN : '#111111',
+          color: '#fff',
+          padding: '12px 20px',
+          borderRadius: '25px',
+          fontSize: '13px',
+          fontWeight: '700',
+          zIndex: 9999,
+          boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+          maxWidth: '90%',
+          textAlign: 'center',
+          animation: 'slideDown 0.3s ease'
+        }}>
+          {toast.message}
+        </div>
+      )}
+
       <div style={{ width: '100%', maxWidth: '380px', background:'#FFFFFF' }}>
         <h1 style={{ fontSize: '28px', fontWeight: '900', textAlign: 'center', marginBottom: '24px', color: '#000' }}>Login</h1>
         
@@ -148,6 +181,13 @@ export default function Login() {
           Don't have an account? <a href="/register" style={{ color: HOT_GREEN, textDecoration: 'underline', fontWeight: '700' }}>Register</a>
         </p>
       </div>
+
+      <style>{`
+        @keyframes slideDown {
+          from { transform: translate(-50%, -100%); opacity: 0; }
+          to { transform: translate(-50%, 0); opacity: 1; }
+        }
+      `}</style>
     </div>
   )
 }

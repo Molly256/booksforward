@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 export default function Register() {
   const router = useRouter()
   const lockRef = useRef(false)
-
   const [mounted, setMounted] = useState(false)
+  const [toast, setToast] = useState(null)
 
   const [form, setForm] = useState({
     username: '',
@@ -20,14 +20,18 @@ export default function Register() {
   const [showRepeatPassword, setShowRepeatPassword] = useState(false)
   const [isLocked, setIsLocked] = useState(false)
 
+  // BLACK TOAST FUNCTION
+  const showToast = (message, type = 'error') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
   useEffect(() => {
     setMounted(true)
-    
     if (typeof window !== 'undefined') {
       const code = sessionStorage.getItem('activeInviterCode') || 
                    sessionStorage.getItem('referrer_code') || 
                    localStorage.getItem('referrer_code')
-
       if (code) {
         setForm(prev => ({ ...prev, inviterCode: code }))
         setIsLocked(true)
@@ -46,27 +50,27 @@ export default function Register() {
     lockRef.current = true
 
     if (!/^[a-zA-Z0-9]{6}$/.test(form.username)) {
-      alert('Username must be 6 letters and numbers combined')
+      showToast('Username must be 6 letters and numbers combined')
       lockRef.current = false
       return
     }
     if (!/^07\d{8}$/.test(form.phone)) {
-      alert('Phone must start with 07 and be 10 digits')
+      showToast('Phone must start with 07 and be 10 digits')
       lockRef.current = false
       return
     }
     if (!/^[a-zA-Z0-9]{6}$/.test(form.password)) {
-      alert('Password must be 6 letters and numbers')
+      showToast('Password must be 6 letters and numbers')
       lockRef.current = false
       return
     }
     if (form.password !== form.repeatPassword) {
-      alert('Passwords do not match')
+      showToast('Passwords do not match')
       lockRef.current = false
       return
     }
     if (!form.inviterCode || !/^\d{6}BF$/.test(form.inviterCode)) {
-      alert('Valid invite code required - format 6 digits + BF e.g. 185973BF')
+      showToast('Valid invite code required - e.g. 185973BF')
       lockRef.current = false
       return
     }
@@ -98,14 +102,15 @@ export default function Register() {
         sessionStorage.removeItem('referrer_code')
         localStorage.removeItem('referrer_code')
         
-        router.push('/login')
+        showToast('Registration successful!', 'success')
+        setTimeout(() => router.push('/login'), 800)
       } else {
-        alert(data.error || 'Registration failed')
+        showToast(data.error || 'Registration failed')
         lockRef.current = false
       }
     } catch (err) {
       console.error('Register error:', err)
-      alert('A network connection error occurred. Please try again.')
+      showToast('Network error. Please try again.')
       lockRef.current = false
     }
   }
@@ -134,7 +139,31 @@ export default function Register() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+    <div style={{ minHeight: '100vh', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative' }}>
+      
+      {/* BLACK TOAST */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: toast.type === 'success' ? HOT_GREEN : '#111111',
+          color: '#fff',
+          padding: '12px 20px',
+          borderRadius: '25px',
+          fontSize: '13px',
+          fontWeight: '700',
+          zIndex: 9999,
+          boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+          maxWidth: '90%',
+          textAlign: 'center',
+          animation: 'slideDown 0.3s ease'
+        }}>
+          {toast.message}
+        </div>
+      )}
+
       <div style={{ width: '100%', maxWidth: '380px', background:'#FFFFFF' }}>
         <h1 style={{ fontSize: '28px', fontWeight: '900', textAlign: 'center', marginBottom: '24px', color: '#000' }}>Register</h1>
         
@@ -191,6 +220,13 @@ export default function Register() {
           Already have an account? <a href="/login" style={{ color: HOT_GREEN, textDecoration: 'underline', fontWeight: '700' }}>Login</a>
         </p>
       </div>
+
+      <style>{`
+        @keyframes slideDown {
+          from { transform: translate(-50%, -100%); opacity: 0; }
+          to { transform: translate(-50%, 0); opacity: 1; }
+        }
+      `}</style>
     </div>
   )
 }
