@@ -1,17 +1,14 @@
 {
-  "name": "booksforward",
-  "short_name": "BF",
+  "name": "BooksForward",
+  "short_name": "BooksForward",
+  "description": "BooksForward - Read and Earn Platform",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#00BFFF",
+  "orientation": "portrait",
+  "scope": "/",
   "icons": [
-    {
-      "src": "/booksforward-icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
     {
       "src": "/booksforward-icon-192.png",
       "sizes": "192x192",
@@ -19,13 +16,7 @@
       "purpose": "any"
     },
     {
-      "src": "booksforward-icon-512.png", 
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/booksforward-512.png", 
+      "src": "/booksforward-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
