@@ -10,14 +10,15 @@ const P = 'bf:'
 const getLabel = (tx) => {
   const t = String(tx.type || '').toLowerCase().trim()
   if (t === 'buy_vip' || t === 'vip') return `VIP ${tx.vipLevel || ''} Purchase`.trim()
-  if (t === 'deposit') return 'Deposit'
+  if (t === 'deposit' || t === 'system increase') return t === 'system increase' ? 'SYSTEM INCREASE' : 'Deposit'
   if (t === 'withdraw') return 'Withdraw'
   if (t === 'refund_vip') return 'VIP Refund'
-  if (t === 'daily_income' || t === 'book_income') return 'Daily Income'
-  if (t === 'team_a_payout') return 'Team A Direct Commission'
-  if (t === 'team_b_payout') return 'Team B Indirect Commission'
-  if (t === 'team_c_payout') return 'Team C Indirect Commission'
-  if (t === 'commission') return 'Team Commission'
+  if (t === 'daily_income' || t === 'book_income' || t === 'daily income') return 'Daily Income'
+  if (t === 'team_a_payout') return 'Team A Commission'
+  if (t === 'team_b_payout') return 'Team B Commission'
+  if (t === 'team_c_payout') return 'Team C Commission'
+  if (t === 'commission' || t === 'team' || t === 'myteam' || t === 'invite') return 'Team Commission'
+  if (t === 'wheel' || t === 'lucky wheel' || t === 'magical wheel' || t === 'lucky_wheel' || t === 'magical_wheel') return 'Magical Wheel'
   return tx.type? tx.type.replace(/_/g,' ').toUpperCase() : 'Transaction'
 }
 
@@ -30,7 +31,8 @@ function getUgandaDateString() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' });
 }
 function getUgandaDateTimeString() {
-  return new Date().toLocaleString("en-CA", { timeZone: "Africa/Kampala", hour12: false }).slice(0,16).replace(',', '');
+  // FIXED: YYYY-MM-DD HH:mm:ss with hour-minute-seconds
+  return new Date().toLocaleString("en-CA", { timeZone: "Africa/Kampala", hour12: false }).replace(',', '').slice(0,19);
 }
 function getUgandaNow() {
   return new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" }));
@@ -44,9 +46,14 @@ export async function POST(req) {
 
     const cleanType = String(type).toLowerCase().trim()
 
-    // BLOCK system_increase completely
+    // Allow system_increase ONLY if coming from admin (block for normal users)
+    // Normal users cannot spoof it, but admin route uses direct redis push
     if (cleanType === 'system_increase' || cleanType === 'registration_reward') {
+      // Keep blocked for user-facing POST - admin uses /api/admin
       return NextResponse.json({ error: 'Transaction type disabled' }, { status: 400 })
+    }
+    if (cleanType.includes('share')) {
+      return NextResponse.json({ error: 'Shares disabled' }, { status: 400 })
     }
 
     let amt = Number(amount)
@@ -76,9 +83,25 @@ export async function POST(req) {
     if (cleanType === 'deposit' || isWithdrawal) status = 'pending'
 
     const dateStr = getUgandaDateString();
-    const timeStr = getUgandaDateTimeString();
+    const timeStr = getUgandaDateTimeString(); // YYYY-MM-DD HH:mm:ss
 
-    const tx = { id, type: cleanType, label: getLabel({type: cleanType, vipLevel}), amount: String(amount), status, createdAt: timeStr, phone, method: method || '', withdrawPhone: withdrawPhone || '', withdrawName: withdrawName || '', bookTitle: bookTitle || '', vipLevel: String(vipLevel || ''), note: note || '' }
+    const tx = { 
+      id, 
+      type: cleanType === 'lucky wheel' ? 'magical wheel' : cleanType === 'myteam' ? 'team' : cleanType, 
+      label: getLabel({type: cleanType, vipLevel}), 
+      amount: String(amount), 
+      status, 
+      createdAt: timeStr, 
+      timestamp: timeStr,
+      updatedAt: timeStr,
+      phone, 
+      method: method || '', 
+      withdrawPhone: withdrawPhone || '', 
+      withdrawName: withdrawName || '', 
+      bookTitle: bookTitle || '', 
+      vipLevel: String(vipLevel || ''), 
+      note: note || '' 
+    }
 
     const txString = JSON.stringify(tx)
     const dayKey = `${P}tx:${phone}:${dateStr}`
@@ -125,15 +148,36 @@ export async function GET(request) {
 
       let uiType = String(tx.type || '').toLowerCase().trim();
 
-      // REMOVE shares + system_increase + registration rewards
+      // REMOVE only shares - KEEP system_increase for admin deposits
       if (uiType.includes('share')) continue;
-      if (uiType === 'system_increase' || uiType === 'registration_reward') continue;
+      if (uiType === 'registration_reward') continue;
 
       if (uiType === 'buy_vip') uiType = 'vip'
       if (uiType === 'daily_income' || uiType === 'book_income') uiType = 'daily income'
+      if (uiType === 'lucky wheel' || uiType === 'lucky_wheel' || uiType === 'wheel') uiType = 'magical wheel'
+      if (uiType === 'myteam') uiType = 'team'
+      if (uiType === 'system_increase') uiType = 'system increase' // keep visible
+
+      // ensure YYYY-MM-DD HH:mm:ss
+      let created = tx.createdAt || tx.timestamp || getUgandaDateTimeString()
+      created = String(created).slice(0,19)
 
       transactions.push({
-        id: String(tx.id), type: uiType, label: tx.label || getLabel(tx), amount: String(tx.amount), note: tx.note || '', status: (tx.status === 'completed' || tx.status === 'success')? 'success' : tx.status, createdAt: tx.createdAt, phone: tx.phone || phone, method: tx.method || '', withdrawPhone: tx.withdrawPhone || '', withdrawName: tx.withdrawName || '', bookTitle: tx.bookTitle || '', vipLevel: tx.vipLevel || ''
+        id: String(tx.id), 
+        type: uiType, 
+        label: tx.label || getLabel({...tx, type: uiType}), 
+        amount: String(tx.amount), 
+        note: tx.note || '', 
+        status: (tx.status === 'completed' || tx.status === 'success')? 'success' : tx.status, 
+        createdAt: created,
+        timestamp: created,
+        updatedAt: tx.updatedAt || created,
+        phone: tx.phone || phone, 
+        method: tx.method || '', 
+        withdrawPhone: tx.withdrawPhone || '', 
+        withdrawName: tx.withdrawName || '', 
+        bookTitle: tx.bookTitle || '', 
+        vipLevel: tx.vipLevel || ''
       });
     }
     return NextResponse.json({ success: true, availableBalance, transactions }, { headers: { 'Cache-Control': 'no-store' } })
