@@ -44,7 +44,8 @@ const getUgandaDateTimeString = () => new Date().toLocaleString("en-CA", { timeZ
 
 function assignBooksToUser(phone, vipLevel, today, pipeline) {
   const selectedVip = VIPS[vipLevel];
-  const validBooks = pickRandomBooks(selectedVip.books);
+  const booksCount = selectedVip.books;
+  const validBooks = pickRandomBooks(booksCount);
   if (validBooks.length === 0) throw new Error('No books found');
 
   validBooks.forEach(b => {
@@ -68,54 +69,60 @@ export async function GET() {
 export async function POST(req) {
   try {
     const body = await req.json(), phone = body.phone, action = body.action, payload = body.payload;
-    if (!phone || action!== 'BUY_VIP') return NextResponse.json({ success: false, message: 'Missing data' }, { status: 400 });
+    if (!phone || action!== 'UPGRADE') return NextResponse.json({ success: false, message: 'Missing data' }, { status: 400 });
 
     const vipLevel = payload?.vipLevel;
-    if (!vipLevel ||!VIPS[vipLevel] || vipLevel > 3) return NextResponse.json({ success: false, message: 'Invalid level' }, { status: 400 });
+    if (vipLevel === undefined ||!VIPS[vipLevel] || vipLevel > 4) return NextResponse.json({ success: false, message: 'Invalid level' }, { status: 400 });
 
     const userKey = 'user:' + phone, user = await redis.hgetall(userKey);
     if (!user ||!user.phone) return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
 
     const currentVip = Number(user.vip || 0);
-    if (vipLevel <= currentVip) return NextResponse.json({ success: false, message: 'Already owned' }, { status: 400 });
+    if (vipLevel <= currentVip && vipLevel!== 0) return NextResponse.json({ success: false, message: 'Already owned' }, { status: 400 });
 
-    const currentPricePaid = Number(user.vipPricePaid || 0), upgradeCost = VIPS[vipLevel].price, currentBalance = Number(user.availableBalance || 0);
-    if (currentBalance < upgradeCost) return NextResponse.json({ success: false, message: 'Insufficient Balance' }, { status: 400 });
+    const upgradeCost = VIPS[vipLevel].price;
+    const currentBalance = Number(user.availableBalance || 0);
+
+    if (vipLevel!== 0 && currentBalance < upgradeCost) {
+      return NextResponse.json({ success: false, message: 'Insufficient Balance' }, { status: 400 });
+    }
 
     const isFirst = user.hasBoughtVip!== 'true' && user.hasBoughtVip!== true;
     const dateStr = getUgandaDateString(), timeStr = getUgandaDateTimeString(), historyKey = 'tx:' + phone + ':history', pipeline = redis.pipeline();
 
-    // --- UGANDA WEEKEND RESTRICTION CHECK ---
     const ugDay = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" })).getDay();
     const isUgandaWeekend = ugDay === 0 || ugDay === 6;
     const shouldAssignBooks = payload?.assignBooks!== false &&!isUgandaWeekend;
 
     let unlockedBooks = [], assignedBooksMeta = [];
-    if (isFirst) {
-      if (shouldAssignBooks) {
-        const assignResult = assignBooksToUser(phone, vipLevel, dateStr, pipeline);
-        unlockedBooks = assignResult.unlockedBooks;
-        assignedBooksMeta = assignResult.assignedBooksMeta;
-      }
+
+    if (shouldAssignBooks) {
+      const assignResult = assignBooksToUser(phone, vipLevel, dateStr, pipeline);
+      unlockedBooks = assignResult.unlockedBooks;
+      assignedBooksMeta = assignResult.assignedBooksMeta;
     } else {
       unlockedBooks = safeParse(user.unlockedBooks);
     }
 
-    let newBalance = currentBalance - upgradeCost + (isFirst? 0 : currentPricePaid);
+    let newBalance = vipLevel === 0? currentBalance : currentBalance - upgradeCost;
 
-    if (!isFirst) {
-      pipeline.lpush(historyKey, JSON.stringify({ id: 'rf_' + Date.now(), type: 'refund_vip', amount: String(currentPricePaid), note: 'VIP ' + currentVip + ' Refund', status: 'success', createdAt: timeStr }));
-    }
-    pipeline.lpush(historyKey, JSON.stringify({ id: 'by_' + Date.now(), type: 'buy_vip', amount: String(-upgradeCost), note: VIPS[vipLevel].name + ' Purchase', status: 'success', createdAt: timeStr }));
+    pipeline.lpush(historyKey, JSON.stringify({ id: 'up_' + Date.now(), type: 'upgrade_vip', amount: String(-upgradeCost), note: 'Vip' + vipLevel + ' Upgrade', status: 'success', createdAt: timeStr }));
 
-    // === WHEEL LOGIC START: Give 1 spin to buyer - always 1 no matter VIP level ===
     pipeline.hincrby(userKey, 'spins', 1);
-    // === WHEEL LOGIC END ===
 
+    const expiryDays = VIPS[vipLevel].days || (vipLevel === 0? 1 : 365);
     pipeline.hset(userKey, {
-      vip: String(vipLevel), vipPricePaid: String(upgradeCost), availableBalance: String(newBalance), hasBoughtVip: 'true',
-      vipExpiry: new Date(Date.now() + 31536000000).toISOString(), unlockedBooks: JSON.stringify(unlockedBooks),
-      completedBooks: '[]', books_read_today: '0', dailyIncome: '0', lastResetDate: dateStr, vip_bought_date: dateStr
+      vip: String(vipLevel),
+      vipPricePaid: String(upgradeCost),
+      availableBalance: String(newBalance),
+      hasBoughtVip: 'true',
+      vipExpiry: new Date(Date.now() + (expiryDays * 24 * 60 * 60 * 1000)).toISOString(),
+      unlockedBooks: JSON.stringify(unlockedBooks),
+      completedBooks: '[]',
+      books_read_today: '0',
+      dailyIncome: '0',
+      lastResetDate: dateStr,
+      vip_bought_date: dateStr
     });
 
     await pipeline.exec();
@@ -129,7 +136,8 @@ export async function POST(req) {
 
 async function processHierarchicalCommissions(buyerPhone, buyerVipLevel) {
   try {
-    const vipAmts = { 1: 80000, 2: 250000, 3: 790000 }, timeStr = getUgandaDateTimeString();
+    const vipAmts = { 0: 0, 1: 50000, 2: 230000, 3: 650000, 4: 850000 };
+    const timeStr = getUgandaDateTimeString();
     const rates = [0.10, 0.02, 0.01], labels = ['A', 'B', 'C'], typeFlags = ['team_a_payout', 'team_b_payout', 'team_c_payout'];
 
     const parent = await redis.hget('user:' + buyerPhone, 'invited_by');
@@ -153,11 +161,9 @@ async function processHierarchicalCommissions(buyerPhone, buyerVipLevel) {
     for (let i = 0; i < 3; i++) {
       const uplinePhone = chain[i];
       if (!uplinePhone) continue;
-
       const userData = uplineData[i] || {}, uplineVip = Number(userData.vip || 0), hasBoughtVipStatus = userData.hasBoughtVip;
       if (hasBoughtVipStatus!== 'true' && hasBoughtVipStatus!== true) continue;
-
-      if (uplineVip > 0) {
+      if (uplineVip >= 0) {
         const reward = Math.floor((vipAmts[Math.min(uplineVip, buyerVipLevel)] || 0) * rates[i]);
         if (reward > 0) {
           hasQueuedOps = true;
@@ -166,12 +172,9 @@ async function processHierarchicalCommissions(buyerPhone, buyerVipLevel) {
             type: typeFlags[i], label: 'commission', amount: String(reward), note: 'Invitation Rewards (Team ' + labels[i] + ': ' + buyerPhone + ')', status: 'success', createdAt: timeStr
           }));
           commissionPipeline.hincrby('user:' + uplinePhone, 'availableBalance', reward);
-
-          // === WHEEL LOGIC START: Give 1 spin to direct inviter only - always 1 no matter VIP level ===
-          if (i === 0) { // Team A = direct inviter only
+          if (i === 0) {
             commissionPipeline.hincrby('user:' + uplinePhone, 'spins', 1);
           }
-          // === WHEEL LOGIC END ===
         }
       }
     }

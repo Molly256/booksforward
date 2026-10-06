@@ -1,11 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-// 1. Separate component to safely process URL params without crashing Vercel
+// DO NOT TOUCH - Your inviter tracking logic
 function SearchParamsTracker() {
   const searchParams = useSearchParams()
   const refCode = searchParams.get('ref')
@@ -17,90 +16,94 @@ function SearchParamsTracker() {
     }
   }, [refCode])
 
-  return null // Hidden utility logic, does not change your UI layout
+  return null
 }
 
 export default function Home() {
-  
-  // Directly inject and force override the browser tab icon (favicon) 
-  useEffect(() => {
-    const links = document.querySelectorAll("link[rel*='icon']")
-    links.forEach(el => el.parentNode.removeChild(el))
-
-    const link = document.createElement('link')
-    link.type = 'image/png'
-    link.rel = 'shortcut icon'
-    link.href = '/palamedes-icon-192.png'
-    
-    document.head.appendChild(link)
-  }, [])
 
   return (
     <main style={{
       display: 'flex',
       height: '100vh',
       flexDirection: 'column',
-      // FIXED: Removed the linear-gradient overlay tint completely so the logo is perfectly clear
-      backgroundImage: 'url(/palamedes-icon-512.png)',
-      // FIXED: Switched to 'initial' size and centered it so it shows crisp and sharp
-      backgroundSize: 'auto', 
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat',
-      backgroundColor: '#ffffff', 
-      paddingBottom: '90px'
+      backgroundColor: '#000000',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px',
+      textAlign: 'center'
     }}>
-      
-      {/* 2. Wrap your search hook component inside a native Suspense container */}
+
       <Suspense fallback={null}>
         <SearchParamsTracker />
       </Suspense>
-      
+
+      {/* WELCOME TO BOOKSFORWARD - Hot Orange */}
+      <h1 style={{
+        color: '#FF4F00',
+        fontWeight: '900',
+        fontSize: '2rem',
+        letterSpacing: '2px',
+        marginBottom: '32px',
+        textTransform: 'uppercase'
+      }}>
+        WELCOME TO BOOKSFORWARD
+      </h1>
+
+      {/* BF Logo in Hot Orange */}
       <div style={{
+        width: '130px',
+        height: '130px',
+        backgroundColor: '#FF4F00',
+        borderRadius: '24px',
         display: 'flex',
-        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        flexDirection: 'column',
-        gap: '24px',
-        padding: '20px'
+        marginBottom: '24px',
+        boxShadow: '0 0 40px rgba(255, 79, 0, 0.6)'
       }}>
-        <Link 
-          href="/register"
-          style={{
-            padding: '18px 56px',
-            background: '#00bfff', 
-            color: '#ffffff',
-            borderRadius: '50px', 
-            fontSize: '1.4rem',
-            fontWeight: 'bold',
-            textDecoration: 'none',
-            boxShadow: '0 0 20px rgba(0, 191, 255, 0.6)', 
-            transition: 'all 0.2s ease',
-            textTransform: 'uppercase',
-            letterSpacing: '1px'
-          }}
-        >
-          Get Started
-        </Link>
+        <span style={{
+          color: '#000000',
+          fontWeight: '900',
+          fontSize: '3.5rem',
+          letterSpacing: '-2px'
+        }}>
+          BF
+        </span>
       </div>
 
-      <div style={{
-        background: 'white',
-        padding: '24px 20px',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderTop: '1px solid #e0e0e0'
+      {/* Tagline */}
+      <p style={{
+        color: '#ffffff',
+        fontSize: '1.1rem',
+        marginBottom: '40px',
+        opacity: '0.9'
       }}>
-        <Image 
-          src="/bottom-bg.jpg" 
-          alt="Awards and Certifications Logo Strip"
-          width={900}
-          height={80}
-          style={{maxWidth: '100%', height: 'auto'}}
-          priority
-        />
-      </div>
+        Reading is our priority how about you?
+      </p>
+
+      {/* Orange Box Shaped Button -> Register */}
+      <Link
+        href="/register"
+        style={{
+          display: 'block',
+          width: '100%',
+          maxWidth: '320px',
+          padding: '16px 0',
+          background: '#FF4F00',
+          color: '#000000',
+          borderRadius: '12px',
+          fontSize: '1.2rem',
+          fontWeight: '900',
+          textDecoration: 'none',
+          boxShadow: '0 0 20px rgba(255, 79, 0, 0.5)',
+          textTransform: 'uppercase',
+          letterSpacing: '1px',
+          textAlign: 'center'
+        }}
+      >
+        GET STARTED
+      </Link>
+
     </main>
   )
 }

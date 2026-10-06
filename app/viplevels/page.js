@@ -1,7 +1,6 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import AvatarWithBadge from '../../components/AvatarWithBadge'
 
 const getTodayDateStrFullYear = () => {
   const d = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" }));
@@ -18,7 +17,7 @@ const getTodayTimeStrKampala = () => {
 const isWeekendUganda = () => {
   const ugandaTimeString = new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" })
   const ugandaDate = new Date(ugandaTimeString)
-  const day = ugandaDate.getDay() // 0 = Sunday, 6 = Saturday
+  const day = ugandaDate.getDay()
   return day === 0 || day === 6
 }
 
@@ -38,42 +37,49 @@ const Toast = ({ msg, onClose }) => {
   )
 }
 
+function VipBadge({ color, label, textColor }) {
+  return (
+    <div style={{ width: 88, height: 116, position: 'relative', flexShrink: 0 }}>
+      <svg width="88" height="88" viewBox="0 0 100 100" style={{ position: 'absolute', top: 0, left: 0 }}>
+        <path d="M50 0 L53.5 7.5 L61 2 L63 10 L71 5.5 L71 13.5 L79.5 10.5 L78 18.5 L86 17 L83 25 L90.5 25.5 L86 33 L92.5 35 L87 42 L92 46 L86 52 L90 59 L83 62 L86 70 L78 71.5 L79.5 79.5 L71 79 L71 87 L63 83 L61 91 L53.5 85.5 L50 93 L46.5 85.5 L39 91 L37 83 L29 87 L29 79 L20.5 79.5 L22 71.5 L14 70 L17 62 L10 59 L14 52 L8 46 L13 42 L7.5 35 L14 33 L9.5 25.5 L17 25 L14 17 L22 18.5 L20.5 10.5 L29 13.5 L29 5.5 L37 10 L39 2 Z" fill={color} />
+        <circle cx="50" cy="46.5" r="32" fill="white" opacity="0.18" />
+        <circle cx="50" cy="46.5" r="27" fill={color} style={{ filter: 'brightness(0.92)' }} />
+        <ellipse cx="50" cy="33" rx="14" ry="6" fill="white" opacity="0.22" />
+      </svg>
+      <div style={{ position: 'absolute', top: '25px', left: 0, width: '88px', textAlign: 'center', color: textColor, fontWeight: 900, fontSize: '15px', fontFamily: 'serif', textShadow: '0 1px 2px rgba(0,0,0,0.6)' }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex', gap: '2px', marginTop: '76px', justifyContent: 'center' }}>
+        <div style={{ width: 25, height: 46, background: color, clipPath: 'polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%)', transform: 'rotate(7deg)' }}/>
+        <div style={{ width: 25, height: 46, background: color, clipPath: 'polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%)', transform: 'rotate(-7deg)' }}/>
+      </div>
+    </div>
+  )
+}
+
 export default function VipLevels() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState(null)
 
   const vips = [
-    { level: 1, name: 'VIP 1', price: 80000, books: 4, perBook: 625 },
-    { level: 2, name: 'VIP 2', price: 250000, books: 4, perBook: 2000 },
-    { level: 3, name: 'VIP 3', price: 790000, books: 4, perBook: 6500 },
-    { level: 4, name: 'VIP 4', price: 1000000, books: 5, perBook: 7000 },
-    { level: 5, name: 'VIP 5', price: 1500000, books: 5, perBook: 10000 },
-    { level: 6, name: 'VIP 6', price: 2100000, books: 5, perBook: 14000 },
-    { level: 7, name: 'VIP 7', price: 4000000, books: 5, perBook: 28000 },
-    { level: 8, name: 'VIP 8', price: 4600000, books: 5, perBook: 32000 },
-    { level: 9, name: 'VIP 9', price: 5000000, books: 5, perBook: 40000 },
-    { level: 10, name: 'VIP 10', price: 8000000, books: 5, perBook: 60000 },
+    { level: 0, name: 'Vip0', price: 0, color: '#FF4F00', textColor: '#FFFFFF' },
+    { level: 1, name: 'Vip1', price: 50000, color: '#E10600', textColor: '#FFFFFF' },
+    { level: 2, name: 'Vip2', price: 230000, color: '#0066FF', textColor: '#FFFFFF' },
+    { level: 3, name: 'Vip3', price: 650000, color: '#00A63D', textColor: '#FFFFFF' },
+    { level: 4, name: 'Vip4', price: 850000, color: '#E6A000', textColor: '#000000' },
   ]
 
-  const hotColors = {
-    1: '#00BFFF', 2: '#FFD700', 3: '#FF00FF', 4: '#FF1493',
-    5: '#FF4500', 6: '#32CD32', 7: '#FF69B4', 8: '#DC143C', 9: '#9400D3', 10: '#FF8C00'
-  }
-
   useEffect(() => {
-    const userData = JSON.parse(localStorage.getItem('palamedes_user') || '{}')
+    const userData = JSON.parse(localStorage.getItem('booksforward_user') || '{}')
     if (!userData.phone) return
-
     const today = new Date().toISOString().split('T')[0]
     const lastReset = userData.lastResetDate || ''
-
     if (lastReset !== today) {
       userData.books_read_today = 0
       userData.dailyIncome = 0
       userData.lastResetDate = today
     }
-
     userData.vip = Number(userData.vip || 0)
     userData.availableBalance = Number(userData.availableBalance || 0)
     userData.vipPricePaid = Number(userData.vipPricePaid || 0)
@@ -81,8 +87,7 @@ export default function VipLevels() {
     userData.books_read_today = Number(userData.books_read_today || 0)
     userData.unlockedBooks = userData.unlockedBooks || []
     userData.completedBooks = userData.completedBooks || []
-
-    localStorage.setItem('palamedes_user', JSON.stringify(userData))
+    localStorage.setItem('booksforward_user', JSON.stringify(userData))
     setUser(userData)
   }, [])
 
@@ -94,25 +99,15 @@ export default function VipLevels() {
       showToast('You already have this VIP or higher')
       return
     }
-    if (vip.level > 3) {
-      showToast('VIP 4-10 is locked')
-      return
-    }
-
-    const currentPricePaid = Number(user.vipPricePaid || 0)
-    const upgradeCost = vip.price - currentPricePaid 
-
     if ((user.availableBalance || 0) < vip.price) {
       showToast('Insufficient Available Balance')
       return
     }
-
     setLoading(true)
     try {
       const dateStr = getTodayDateStrFullYear();
       const timeStr = getTodayTimeStrKampala();
       const isWeekend = isWeekendUganda(); 
-
       const res = await fetch('/api/viplevels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,27 +118,23 @@ export default function VipLevels() {
             vipLevel: vip.level,
             vipName: vip.name,
             price: vip.price,
-            books: vip.books,
+            books: 4,
             dateStr, 
             timeStr, 
             assignBooks: !isWeekend 
           }
         })
       })
-
       const data = await res.json()
-
       if (!data.success || !data.user) {
         showToast(data.message || 'Purchase failed')
         setLoading(false)
         return
       }
-
       const updatedUser = { ...data.user }
-      localStorage.setItem('palamedes_user', JSON.stringify(updatedUser))
+      localStorage.setItem('booksforward_user', JSON.stringify(updatedUser))
       setUser(updatedUser)
       showToast(isWeekend ? 'VIP Buy Successful - Books unlock on Monday' : 'VIP Buy Successful') 
-
     } catch (err) {
       showToast('Error: ' + err.message)
     } finally {
@@ -152,81 +143,76 @@ export default function VipLevels() {
   }
 
   if (!user) return null
-
   const currentVipLevel = Number(user.vip || 0)
 
   return (
-    <main style={{ minHeight: '100vh', background: '#FFFFFF', padding: '20px' }}>
+    <main style={{ minHeight: '100vh', background: '#FFFFFF', padding: '20px', paddingBottom: '90px' }}>
       {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '30px' }}>
-        <Link href="/dashboard" style={{ fontSize: '16px', color: '#00BFFF', fontWeight: '900', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', paddingTop: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '30px' }}>
+        <Link href="/dashboard" style={{ fontSize: '16px', color: '#FF4F00', fontWeight: '900', textDecoration: 'none' }}>
           ← Back
         </Link>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-          <AvatarWithBadge
-            username={user.username}
-            vipLevel={currentVipLevel}
-            size={60}
-            avatar={user?.avatar || ''}
-            key={currentVipLevel + '-' + user.availableBalance}
-          />
-          <div style={{ marginTop: '8px', textAlign: 'left' }}>
-            <p style={{ margin: 0, fontWeight: '900', color: '#000', fontSize: '15px' }}>
-              Available Balance: {user.availableBalance?.toLocaleString() || 0} shs
-            </p>
-            <p style={{ margin: '2px 0 0', fontSize: '13px', fontWeight: '700', color: '#000' }}>
-              {vips.find(v => v.level === currentVipLevel)?.name || 'No VIP'}
-            </p>
-            {user.vipExpiry && (
-              <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#666', fontWeight: '600' }}>
-                Expires: {new Date(user.vipExpiry).toLocaleDateString('en-GB')}
-              </p>
-            )}
-          </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ margin: 0, fontWeight: '900', color: '#000', fontSize: '14px' }}>
+            Balance: {user.availableBalance?.toLocaleString() || 0} UGX
+          </p>
+          <p style={{ margin: '2px 0 0', fontSize: '13px', fontWeight: '700', color: '#000' }}>
+            {vips.find(v => v.level === currentVipLevel)?.name || 'Vip0'}
+          </p>
         </div>
       </div>
 
-      <h2 style={{ fontSize: '24px', fontWeight: '900', marginBottom: '20px', color: '#000' }}>VIP Levels</h2>
+      <h2 style={{ fontSize: '22px', fontWeight: '900', marginBottom: '22px', color: '#000', textAlign: 'center', letterSpacing: '1px' }}>VIP LEVELS</h2>
 
-      <div style={{ display: 'grid', gap: '12px', marginBottom: '40px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '420px', margin: '0 auto' }}>
         {vips.map(vip => {
           const isCurrent = currentVipLevel === vip.level
           const isOwned = currentVipLevel >= vip.level
-          const isLocked = vip.level >= 4
-          const canBuy = vip.level > currentVipLevel && !isLocked
+          const canBuy = vip.level > currentVipLevel
 
           return (
             <div key={vip.level} style={{
-              background: hotColors[vip.level],
-              padding: '18px 20px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between',
-              alignItems: 'center', minHeight: '75px', opacity: isOwned ? 0.6 : 1
+              background: '#fff',
+              border: '1px solid #f0f0f0',
+              borderRadius: '16px',
+              padding: '14px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
             }}>
-              <div style={{ color: '#000' }}>
-                <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#000' }}>{vip.name}</p>
-                <p style={{ margin: '4px 0 0', fontSize: '13px', fontWeight: '800', color: '#000' }}>
-                  Daily books: {vip.books} books @ {vip.perBook.toLocaleString()}shs
-                </p>
-                <p style={{ margin: '4px 0 0', fontWeight: '900', color: '#000' }}>{vip.price.toLocaleString()}shs</p>
-              </div>
+              <VipBadge color={vip.color} label={`VIP${vip.level}`} textColor={vip.textColor} />
 
-              <div>
-                {canBuy && (
+              <div style={{ marginLeft: '16px', flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontWeight: 900, fontSize: '16px', color: '#111' }}>{vip.name}</span>
+                  <span style={{ fontWeight: 800, fontSize: '15px', color: '#111' }}>{vip.price.toLocaleString()} UGX</span>
+                </div>
+
+                {canBuy ? (
                   <button
                     onClick={() => handleBuyVip(vip)}
                     disabled={loading}
                     style={{
-                      padding: '10px 24px', borderRadius: '50px', border: 'none',
-                      background: 'white', fontWeight: '900', cursor: loading ? 'not-allowed' : 'pointer',
-                      color: '#000', opacity: loading ? 0.6 : 1
+                      width: '100%',
+                      background: vip.color,
+                      color: vip.textColor,
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '11px 0',
+                      fontWeight: '900',
+                      fontSize: '14px',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      boxShadow: `0 4px 12px ${vip.color}55`,
                     }}
                   >
-                    BUY
+                    UPGRADE
                   </button>
+                ) : isCurrent ? (
+                  <div style={{ width: '100%', background: '#f2f2f2', borderRadius: '10px', padding: '11px 0', fontWeight: '900', fontSize: '14px', textAlign: 'center' }}>✅ CURRENT</div>
+                ) : (
+                  <div style={{ width: '100%', background: '#f2f2f2', borderRadius: '10px', padding: '11px 0', fontWeight: '900', fontSize: '14px', textAlign: 'center' }}>Owned</div>
                 )}
-                {isLocked && vip.level > currentVipLevel && <div style={{ fontSize: '28px' }}>🔒</div>}
-                {isCurrent && <div style={{ fontSize: '24px' }}>✅</div>}
-                {isOwned && !isCurrent && <div style={{ fontSize: '18px', fontWeight: '900', color: '#000' }}>Owned</div>}
               </div>
             </div>
           )
