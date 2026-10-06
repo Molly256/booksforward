@@ -9,6 +9,8 @@ export default function Login() {
   const [form, setForm] = useState({ phone: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
 
+  const HOT_GREEN = '#00C853'
+
   const handlePhoneChange = (val) => {
     const cleaned = val.replace(/\D/g, '').slice(0, 10)
     setForm(prev => ({ ...prev, phone: cleaned }))
@@ -51,7 +53,11 @@ export default function Login() {
 
       if (data && data.user) {
         localStorage.setItem('booksforward_user', JSON.stringify(data.user))
-        router.push('/dashboard')
+        if (data.user.isAdmin) {
+          router.push('/admin')
+        } else {
+          router.push('/dashboard')
+        }
       } else {
         alert('Server returned an incomplete user session. Please try again.')
         lockRef.current = false
@@ -72,14 +78,14 @@ export default function Login() {
     padding: '0 12px',
     fontSize: '16px',
     color: '#000',
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     outline: 'none',
     boxSizing: 'border-box'
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-      <div style={{ width: '100%', maxWidth: '380px' }}>
+    <div style={{ minHeight: '100vh', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+      <div style={{ width: '100%', maxWidth: '380px', background:'#FFFFFF' }}>
         <h1 style={{ fontSize: '28px', fontWeight: '900', textAlign: 'center', marginBottom: '24px', color: '#000' }}>Login</h1>
         
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -125,12 +131,13 @@ export default function Login() {
               height: '44px',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: '#FF8C00',
+              backgroundColor: HOT_GREEN,
               color: '#fff',
               fontWeight: '700',
               fontSize: '16px',
               cursor: 'pointer',
-              marginTop: '4px'
+              marginTop: '4px',
+              boxShadow:'0 4px 10px rgba(0,200,83,0.35)'
             }}
           >
             Login
@@ -138,7 +145,7 @@ export default function Login() {
         </form>
         
         <p style={{ textAlign: 'center', fontSize: '15px', color: '#000', marginTop: '16px' }}>
-          Don't have an account? <a href="/register" style={{ color: '#FF8C00', textDecoration: 'underline', fontWeight: '700' }}>Register</a>
+          Don't have an account? <a href="/register" style={{ color: HOT_GREEN, textDecoration: 'underline', fontWeight: '700' }}>Register</a>
         </p>
       </div>
     </div>

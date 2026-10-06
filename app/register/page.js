@@ -112,11 +112,13 @@ export default function Register() {
 
   if (!mounted) {
     return (
-      <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <p style={{ color: '#666', fontSize: '16px' }}>Loading form safely...</p>
       </div>
     )
   }
+
+  const HOT_GREEN = '#00C853'
 
   const inputStyle = {
     width: '100%',
@@ -126,14 +128,14 @@ export default function Register() {
     padding: '0 12px',
     fontSize: '16px',
     color: '#000',
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     outline: 'none',
     boxSizing: 'border-box'
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-      <div style={{ width: '100%', maxWidth: '380px' }}>
+    <div style={{ minHeight: '100vh', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+      <div style={{ width: '100%', maxWidth: '380px', background:'#FFFFFF' }}>
         <h1 style={{ fontSize: '28px', fontWeight: '900', textAlign: 'center', marginBottom: '24px', color: '#000' }}>Register</h1>
         
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -169,24 +171,24 @@ export default function Register() {
 
           <div>
             <label style={{ fontSize: '15px', color: '#000', display: 'block', marginBottom: '6px', fontWeight: '700' }}>
-              Invite Code {isLocked && <span style={{color:'#FF8C00', fontSize:'12px'}}>From {form.inviterCode}</span>}
+              Invite Code {isLocked && <span style={{color:HOT_GREEN, fontSize:'12px'}}> From {form.inviterCode}</span>}
             </label>
             <input
               type="text"
               value={form.inviterCode}
               readOnly
               placeholder="No inviter"
-              style={{...inputStyle, backgroundColor: isLocked ? '#FFF7ED' : '#f3f4f6', color: '#000', fontWeight: isLocked ? '900' : '400'}}
+              style={{...inputStyle, backgroundColor: isLocked ? '#E8F5E9' : '#f9fafb', color: '#000', fontWeight: isLocked ? '900' : '400'}}
             />
           </div>
 
-          <button type="submit" style={{ width: '100%', height: '44px', borderRadius: '8px', border: 'none', backgroundColor: '#FF8C00', color: '#fff', fontWeight: '700', fontSize: '16px', cursor: 'pointer', marginTop: '4px' }}>
+          <button type="submit" style={{ width: '100%', height: '44px', borderRadius: '8px', border: 'none', backgroundColor: HOT_GREEN, color: '#fff', fontWeight: '700', fontSize: '16px', cursor: 'pointer', marginTop: '4px', boxShadow:'0 4px 10px rgba(0,200,83,0.35)' }}>
             Register
           </button>
         </form>
         
         <p style={{ textAlign: 'center', fontSize: '15px', color: '#000', marginTop: '16px' }}>
-          Already have an account? <a href="/login" style={{ color: '#FF8C00', textDecoration: 'underline', fontWeight: '700' }}>Login</a>
+          Already have an account? <a href="/login" style={{ color: HOT_GREEN, textDecoration: 'underline', fontWeight: '700' }}>Login</a>
         </p>
       </div>
     </div>

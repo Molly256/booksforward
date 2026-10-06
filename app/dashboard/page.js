@@ -1,8 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import Link from 'next/link' 
-import AvatarWithBadge from '../../components/AvatarWithBadge'
-import Card from '../../components/Card'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 export default function Dashboard() {
@@ -10,7 +8,7 @@ export default function Dashboard() {
   const [user, setUser] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
-        const cached = localStorage.getItem('booksforward_user') || localStorage.getItem('booksforward_user')
+        const cached = localStorage.getItem('booksforward_user')
         return cached ? JSON.parse(cached) : null
       } catch { return null }
     }
@@ -18,31 +16,32 @@ export default function Dashboard() {
   })
   const [loading, setLoading] = useState(!user)
   const ADMIN_PHONE = '0753520252'
+  const HOT_GREEN = '#00C853'
+
   const normalizePhone = (phone) => {
     if (!phone) return ''
     phone = String(phone).trim().replace(/\D/g, '')
     if (!/^07\d{8}$/.test(phone)) return ''
     return phone
   }
+
   const loadUser = async () => {
-    if (typeof window === 'undefined') return
-    const cachedData = localStorage.getItem('booksforward_user') || localStorage.getItem('booksforward_user')
+    const cachedData = localStorage.getItem('booksforward_user')
     let localUser = null
     try { if (cachedData) localUser = JSON.parse(cachedData) } catch { localUser = null }
     if (!localUser && !user) { setLoading(false); router.replace('/register'); return }
-    const cleanPhone = normalizePhone(localUser?.phone || user?.phone)
-    if (!cleanPhone) { if (!user) router.replace('/register'); return }
     try {
+      const cleanPhone = normalizePhone(localUser?.phone || user?.phone)
       const res = await fetch(`/api/user?action=getDashboard&phone=${cleanPhone}&_t=${Date.now()}`)
       const data = await res.json()
       if (data.success && data.user) {
-        const updatedUser = { ...data.user, availableBalance: Number(data.user.availableBalance || 0) }
-        localStorage.setItem('booksforward_user', JSON.stringify(updatedUser))
-        setUser(updatedUser)
+        localStorage.setItem('booksforward_user', JSON.stringify(data.user))
+        setUser(data.user)
       }
-    } catch (e) { console.log('Dashboard sync failed:', e) } finally { setLoading(false) }
+    } catch (e) {} finally { setLoading(false) }
   }
-  useEffect(() => { loadUser(); const h = () => loadUser(); window.addEventListener('focus', h); return () => window.removeEventListener('focus', h) }, [router])
+
+  useEffect(() => { loadUser() }, [])
 
   const menuItems = [
     { icon: '💰', label: 'Deposit', href: '/deposit' },
@@ -57,66 +56,62 @@ export default function Dashboard() {
     { icon: '💬', label: 'Manager', href: '/manager' }
   ]
 
-  const displayBalance = Number(user?.availableBalance || 0)
-  const vipLevel = Number(user?.vip || 0)
-  const vipName = vipLevel > 0 ? `VIP ${vipLevel}` : 'Internship'
+  const isAdmin = normalizePhone(user?.phone) === ADMIN_PHONE
+
+  if (loading) return <div style={{padding:'40px', textAlign:'center', background:'#fff'}}>Loading...</div>
 
   return (
-    <Card>
-      <main style={{ minHeight: 'auto', background: '#FFFFFF', padding: '15px 20px 0', boxSizing: 'border-box' }}>
+    <div style={{ minHeight: '100vh', background: '#FFFFFF' }}>
+      
+      {/* 1. HEADER HOT GREEN */}
+      <h1 style={{
+        margin: '0',
+        padding: '15px 0 12px',
+        fontSize: '30px',
+        fontWeight: '900',
+        color: HOT_GREEN,
+        textAlign: 'center',
+        letterSpacing: '1.5px',
+        background: '#FFFFFF'
+      }}>
+        BOOKSFORWARD
+      </h1>
 
-        {/* TOP CARD - WHITE BG + ORANGE ACCENTS */}
-        <div style={{ 
-          background: '#FFFFFF',
-          border: '2px solid #FF7A00',
-          borderRadius: '20px',
-          padding: '20px 15px',
-          marginBottom: '25px',
-          boxShadow: '0 4px 12px rgba(255,122,0,0.15)',
-          position: 'relative',
-          minHeight: '140px'
-        }}>
-          <div style={{ paddingRight: '90px' }}>
-            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#FF7A00' }}>
-              Welcome to BooksForward
-            </h2>
-            <p style={{ margin: '8px 0 0', fontSize: '16px', fontWeight: '800', color: '#000' }}>
-              Username: {user?.username || 'User'}
-            </p>
-            <p style={{ margin: '6px 0 0', fontSize: '16px', fontWeight: '800', color: '#000' }}>
-              Phone: {user?.phone || 'Not registered'}
-            </p>
-            <p style={{ margin: '12px 0 4px', fontSize: '14px', fontWeight: '800', color: '#FF7A00' }}>
-              Available balance
-            </p>
-            <p style={{ margin: '0', fontSize: '32px', fontWeight: '900', color: '#000' }}>
-              {displayBalance.toLocaleString()} shs
-            </p>
-            <p style={{ margin: '6px 0 0', fontSize: '13px', fontWeight: '900', color: '#fff', background: '#FF7A00', display: 'inline-block', padding: '2px 10px', borderRadius: '20px' }}>
-              {vipName}
-            </p>
-          </div>
-          <div style={{ position: 'absolute', top: '20px', right: '18px' }}>
-            <AvatarWithBadge username={user?.username} vipLevel={vipLevel} size={72} avatar={user?.avatar || ''} />
-          </div>
-        </div>
+      {/* 2. IMAGE FULL WIDTH - EDGE TO EDGE */}
+      <div style={{
+        width: '100vw',
+        marginLeft: 'calc(-50vw + 50%)',
+        height: '210px',
+        overflow: 'hidden',
+        background: '#fff',
+        marginBottom: '22px'
+      }}>
+        <img
+          src="/book.jpg"
+          alt="BooksForward Banner"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display:'block' }}
+        />
+      </div>
 
-        {/* ALL BUTTONS ORANGE - BG STILL WHITE */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '18px 15px', marginBottom: '18px' }}>
+      {/* 3. CONTENT WITH PADDING */}
+      <main style={{ background: '#FFFFFF', padding: '0 20px 90px', maxWidth:'480px', margin:'0 auto' }}>
+
+        {/* BUTTONS HOT GREEN */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '18px 15px' }}>
           {menuItems.map(item => (
             <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ 
+                <div style={{
                   width: '100%', height: '95px',
-                  background: '#FF7A00', 
+                  background: HOT_GREEN,
                   borderRadius: '14px',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '28px', color: '#fff',
-                  boxShadow: '0 4px 10px rgba(255,122,0,0.35)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '30px', color: '#fff',
+                  boxShadow: '0 4px 12px rgba(0,200,83,0.35)'
                 }}>
                   {item.icon}
                 </div>
-                <p style={{ margin: '6px 0 0', fontSize: '12px', fontWeight: '900', color: '#000' }}>
+                <p style={{ margin: '7px 0 0', fontSize: '12px', fontWeight: '800', color: '#111' }}>
                   {item.label}
                 </p>
               </div>
@@ -124,18 +119,18 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {normalizePhone(user?.phone) === ADMIN_PHONE && (
-          <div onClick={() => router.push('/admin')} style={{ 
-              width: '100%', height: '95px', background: '#FF7A00', borderRadius: '14px',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              fontSize: '28px', color: '#fff', cursor: 'pointer',
-              boxShadow: '0 4px 10px rgba(255,122,0,0.35)', marginBottom: '60px'
-            }}>
-            🔐
-            <p style={{ margin: '6px 0 0', fontSize: '12px', fontWeight: '900', color: '#fff' }}>Admin Panel</p>
+        {/* ADMIN ONLY */}
+        {isAdmin && (
+          <div onClick={() => router.push('/admin')} style={{
+            marginTop:'22px', width:'100%', height:'85px', background:'#111', borderRadius:'14px',
+            display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+            fontSize:'26px', color:'#fff', cursor:'pointer', border:`2px solid ${HOT_GREEN}`
+          }}>
+            🔐 <span style={{fontSize:'12px', fontWeight:'900', marginTop:'4px'}}>Admin Panel</span>
           </div>
         )}
+
       </main>
-    </Card>
+    </div>
   )
 }

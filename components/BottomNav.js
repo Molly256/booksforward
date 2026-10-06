@@ -5,7 +5,6 @@ import Link from 'next/link'
 export default function BottomNav() {
   const pathname = usePathname()
   
-  // Only hide on login + register. Admin stays visible.
   const hideOnRoutes = ['/', '/login', '/register'] 
   if (hideOnRoutes.includes(pathname)) {
     return null
@@ -13,8 +12,8 @@ export default function BottomNav() {
 
   const navItems = [
     { href: '/dashboard', icon: '🏠', label: 'Home', color: '#FFB800' },
-    { href: '/books', icon: '📋', label: 'BOOKS', color: '#00D26A' },
-    { href: '/hot', icon: '🔥', label: 'Hot', color: '#FF2E2E' },
+    { href: '/books', icon: '📚', label: 'Tasks', color: '#00D26A' },
+    { href: '/my', icon: '👤', label: 'My', color: '#3B82F6' },
     { href: '/settings', icon: '⚙️', label: 'Settings', color: '#BF5AF2' },
   ]
 
