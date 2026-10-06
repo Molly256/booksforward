@@ -216,7 +216,6 @@ export default function Deposit() {
             </button>
 
             <p className="text-gray-600 text-[12px] mt-3 text-center">
-              After paying, tap the button. Admin will approve and balance will update.
             </p>
           </div>
         )}

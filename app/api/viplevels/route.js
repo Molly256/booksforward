@@ -44,7 +44,7 @@ const getUgandaDateTimeString = () => new Date().toLocaleString("en-CA", { timeZ
 
 function assignBooksToUser(phone, vipLevel, today, pipeline) {
   const selectedVip = VIPS[vipLevel];
-  const booksCount = selectedVip.books;
+  const booksCount = selectedVip.books; // DYNAMIC - not 4
   const validBooks = pickRandomBooks(booksCount);
   if (validBooks.length === 0) throw new Error('No books found');
 
@@ -69,7 +69,8 @@ export async function GET() {
 export async function POST(req) {
   try {
     const body = await req.json(), phone = body.phone, action = body.action, payload = body.payload;
-    if (!phone || action!== 'UPGRADE') return NextResponse.json({ success: false, message: 'Missing data' }, { status: 400 });
+    // ACCEPT BOTH UPGRADE and BUY_VIP for compatibility
+    if (!phone || (action!== 'UPGRADE' && action!== 'BUY_VIP')) return NextResponse.json({ success: false, message: 'Missing data' }, { status: 400 });
 
     const vipLevel = payload?.vipLevel;
     if (vipLevel === undefined ||!VIPS[vipLevel] || vipLevel > 4) return NextResponse.json({ success: false, message: 'Invalid level' }, { status: 400 });
@@ -106,6 +107,7 @@ export async function POST(req) {
 
     let newBalance = vipLevel === 0? currentBalance : currentBalance - upgradeCost;
 
+    // TRANSACTION HISTORY - UPGRADE
     pipeline.lpush(historyKey, JSON.stringify({ id: 'up_' + Date.now(), type: 'upgrade_vip', amount: String(-upgradeCost), note: 'Vip' + vipLevel + ' Upgrade', status: 'success', createdAt: timeStr }));
 
     pipeline.hincrby(userKey, 'spins', 1);

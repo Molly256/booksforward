@@ -4,7 +4,8 @@ export const dynamic = 'force-dynamic'
 import { Redis } from '@upstash/redis'
 import { NextResponse } from 'next/server'
 
-const redis = Redis.fromEnv() 
+const redis = Redis.fromEnv()
+const P = 'bf:'
 
 const getLabel = (tx) => {
   const t = String(tx.type || '').toLowerCase().trim()
@@ -13,208 +14,130 @@ const getLabel = (tx) => {
   if (t === 'withdraw') return 'Withdraw'
   if (t === 'refund_vip') return 'VIP Refund'
   if (t === 'daily_income' || t === 'book_income') return 'Daily Income'
-  if (t === 'shares') return 'Shares Purchase'
-  if (t === 'shares_collected' || t === 'collect_hot') return 'Shares Payout Collected'
-  if (t === 'system_increase') return 'Registration Reward'
-  
   if (t === 'team_a_payout') return 'Team A Direct Commission'
   if (t === 'team_b_payout') return 'Team B Indirect Commission'
   if (t === 'team_c_payout') return 'Team C Indirect Commission'
   if (t === 'commission') return 'Team Commission'
-
-  return tx.type ? tx.type.replace(/_/g,' ').toUpperCase() : 'Transaction'
+  return tx.type? tx.type.replace(/_/g,' ').toUpperCase() : 'Transaction'
 }
 
-const safeParse = (s) => { 
+const safeParse = (s) => {
   if (typeof s === 'object') return s
-  try { return JSON.parse(s) } catch { return null} 
+  try { return JSON.parse(s) } catch { return null }
 }
 
 function getUgandaDateString() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' });
 }
-
 function getUgandaDateTimeString() {
   return new Date().toLocaleString("en-CA", { timeZone: "Africa/Kampala", hour12: false }).slice(0,16).replace(',', '');
 }
-
-// Helper helper function to safely get the current Uganda Date object
 function getUgandaNow() {
-  // This reads the server time, changes it to Uganda text, and creates a clean date object
-  const ugandaText = new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" });
-  return new Date(ugandaText);
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" }));
 }
 
-// =========================================================================
-// POST: Save transaction entry and update availableBalance atomically
-// =========================================================================
 export async function POST(req) {
   try {
     const body = await req.json()
     const { type, phone, amount, method, withdrawPhone, withdrawName, bookTitle, vipLevel, id: customId, note } = body
-    
-    if (!type || !phone || !amount) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    if (!type ||!phone ||!amount) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+
+    const cleanType = String(type).toLowerCase().trim()
+
+    // BLOCK system_increase completely
+    if (cleanType === 'system_increase' || cleanType === 'registration_reward') {
+      return NextResponse.json({ error: 'Transaction type disabled' }, { status: 400 })
     }
 
     let amt = Number(amount)
-    if (isNaN(amt) || amt <= 0) {
-      return NextResponse.json({ error: 'Invalid amount value' }, { status: 400 })
-    }
+    if (isNaN(amt) || amt <= 0) return NextResponse.json({ error: 'Invalid amount value' }, { status: 400 })
 
-    const cleanType = String(type).toLowerCase().trim()
     const isWithdrawal = cleanType === 'withdraw'
 
     if (isWithdrawal) {
       const ugandaDate = getUgandaNow();
-      
-      // 🛑 WEEKEND RESTRICTION CHECK (0 = Sunday, 6 = Saturday in Uganda)
       const day = ugandaDate.getDay()
-      if (day === 0 || day === 6) {
-        return NextResponse.json({ error: 'No time for withdraw on weekends! Please withdraw from Monday to Friday.' }, { status: 400 })
-      }
-
-      // ⏰ TIME RESTRICTION CHECK (10:00 AM to 5:00 PM Uganda Time)
-      const hours = ugandaDate.getHours()
-      const minutes = ugandaDate.getMinutes()
-
-      const totalMinutes = hours * 60 + minutes
-      const startMinutes = 10 * 60 // 10:00 AM
-      const endMinutes = 17 * 60   // 5:00 PM
-
-      if (totalMinutes < startMinutes || totalMinutes > endMinutes) {
-        return NextResponse.json({ error: 'Withdrawals are only open 10:00 AM - 5:00 PM Ugandan Time.' }, { status: 400 })
-      }
+      if (day === 0 || day === 6) return NextResponse.json({ error: 'No withdraw on weekends! Monday to Friday only.' }, { status: 400 })
+      const totalSec = ugandaDate.getHours()*3600 + ugandaDate.getMinutes()*60 + ugandaDate.getSeconds()
+      if (totalSec < 11*3600 || totalSec >= 18*3600) return NextResponse.json({ error: 'Withdrawals only open 11:00 AM - 6:00 PM Ugandan Time.' }, { status: 400 })
     }
 
-    const userKey = `user:${phone}`
-    const grossDeduction = isWithdrawal ? Math.round(amt / 0.9) : amt
+    const userKey = `${P}user:${phone}`
+    const grossDeduction = isWithdrawal? Math.round(amt / 0.9) : amt
 
     if (isWithdrawal) {
       const currentAvailableBalance = Number(await redis.hget(userKey, 'availableBalance') || 0)
-      if (grossDeduction > currentAvailableBalance) {
-        return NextResponse.json({ error: 'Insufficient availableBalance' }, { status: 400 })
-      }
+      if (grossDeduction > currentAvailableBalance) return NextResponse.json({ error: 'Insufficient availableBalance' }, { status: 400 })
       await redis.hincrby(userKey, 'availableBalance', -grossDeduction)
     }
 
     const id = customId || `tx_${Date.now()}_${Math.random().toString(36).slice(2)}`
-    
     let status = 'success'
     if (cleanType === 'deposit' || isWithdrawal) status = 'pending'
-    if (cleanType === 'completed' || cleanType === 'success') status = 'success'
 
     const dateStr = getUgandaDateString();
     const timeStr = getUgandaDateTimeString();
 
-    const tx = {
-      id, 
-      type: cleanType, 
-      label: getLabel({type: cleanType, vipLevel}), 
-      amount: String(amount), 
-      status, 
-      createdAt: timeStr, 
-      phone, 
-      method: method || '',
-      withdrawPhone: withdrawPhone || '', 
-      withdrawName: withdrawName || '',
-      bookTitle: bookTitle || '', 
-      vipLevel: String(vipLevel || ''),
-      note: note || ''
-    }
+    const tx = { id, type: cleanType, label: getLabel({type: cleanType, vipLevel}), amount: String(amount), status, createdAt: timeStr, phone, method: method || '', withdrawPhone: withdrawPhone || '', withdrawName: withdrawName || '', bookTitle: bookTitle || '', vipLevel: String(vipLevel || ''), note: note || '' }
 
     const txString = JSON.stringify(tx)
-    const dayKey = `tx:${phone}:${dateStr}`
-    const historyKey = `tx:${phone}:history`
+    const dayKey = `${P}tx:${phone}:${dateStr}`
+    const historyKey = `${P}tx:${phone}:history`
 
     const pipeline = redis.pipeline()
-    
     pipeline.lpush(dayKey, txString)
     pipeline.lpush(historyKey, txString)
-    
     if (status === 'pending') {
-      pipeline.sadd('admin:pending_txs', dayKey)
-      pipeline.lpush('pending_tx', id) 
+      pipeline.sadd(`${P}admin:pending_txs`, dayKey)
+      pipeline.lpush(`${P}pending_tx`, id)
     }
-    
     await pipeline.exec()
     return NextResponse.json({ success: true, transaction: tx })
-    
   } catch (err) {
-    console.error('POST /api/transactions 500:', err.message)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
 
-// =========================================================================
-// GET: Fetch user transactions strictly from the single lifetime history key
-// =========================================================================
 export async function GET(request) {
   try {
     const phone = request.nextUrl.searchParams.get('phone')
     if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 })
 
-    const historyKey = `tx:${phone}:history`
+    const historyKey = `${P}tx:${phone}:history`
+    const userKey = `${P}user:${phone}`
 
-    // Safely await data and load up to 50 items max to protect database speed
     const [userHashResult, rawItemsResult] = await Promise.all([
-      redis.hgetall(`user:${phone}`),
-      redis.lrange(historyKey, 0, 49)
+      redis.hgetall(userKey),
+      redis.lrange(historyKey, 0, 499)
     ])
-    
+
     const userHash = userHashResult || {}
     const rawItems = rawItemsResult || []
-    
     const availableBalance = Number(userHash.availableBalance || 0)
 
-    // Lightning fast single loop processing
     const transactions = [];
     const seenIds = new Set();
-
-    for (let i = 0; i < rawItems.length; i++) {
-      const tx = safeParse(rawItems[i]);
-      if (!tx || !tx.id) continue;
-
+    for (const raw of rawItems) {
+      const tx = safeParse(raw);
+      if (!tx ||!tx.id) continue;
       if (seenIds.has(tx.id)) continue;
       seenIds.add(tx.id);
 
       let uiType = String(tx.type || '').toLowerCase().trim();
-      if (uiType === 'buy_vip') uiType = 'vip' 
+
+      // REMOVE shares + system_increase + registration rewards
+      if (uiType.includes('share')) continue;
+      if (uiType === 'system_increase' || uiType === 'registration_reward') continue;
+
+      if (uiType === 'buy_vip') uiType = 'vip'
       if (uiType === 'daily_income' || uiType === 'book_income') uiType = 'daily income'
-      if (uiType === 'shares') uiType = 'shares'
-      if (uiType === 'shares_collected') uiType = 'shares'
-      if (uiType === 'system_increase') uiType = 'system_increase'
-      
-      if (uiType === 'team_a_payout') uiType = 'team_a_payout'
-      if (uiType === 'team_b_payout') uiType = 'team_b_payout'
-      if (uiType === 'team_c_payout') uiType = 'team_c_payout'
-      if (uiType === 'commission') uiType = 'commission'
 
       transactions.push({
-        id: String(tx.id), 
-        type: uiType, 
-        label: tx.label || getLabel(tx), 
-        amount: String(tx.amount),
-        note: tx.note || '',
-        status: (tx.status === 'completed' || tx.status === 'success') ? 'success' : tx.status, 
-        createdAt: tx.createdAt, 
-        phone: tx.phone || phone, 
-        method: tx.method || '', 
-        withdrawPhone: tx.withdrawPhone || '',
-        withdrawName: tx.withdrawName || '', 
-        bookTitle: tx.bookTitle || '',
-        vipLevel: tx.vipLevel || ''
+        id: String(tx.id), type: uiType, label: tx.label || getLabel(tx), amount: String(tx.amount), note: tx.note || '', status: (tx.status === 'completed' || tx.status === 'success')? 'success' : tx.status, createdAt: tx.createdAt, phone: tx.phone || phone, method: tx.method || '', withdrawPhone: tx.withdrawPhone || '', withdrawName: tx.withdrawName || '', bookTitle: tx.bookTitle || '', vipLevel: tx.vipLevel || ''
       });
     }
-
-    return NextResponse.json({ 
-      success: true, 
-      availableBalance, 
-      transactions 
-    }, { headers: { 'Cache-Control': 'no-store' } })
-    
+    return NextResponse.json({ success: true, availableBalance, transactions }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
-    console.error('GET /api/transactions 500:', err.message)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }

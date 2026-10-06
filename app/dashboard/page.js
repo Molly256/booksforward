@@ -44,16 +44,15 @@ export default function Dashboard() {
   useEffect(() => { loadUser() }, [])
 
   const menuItems = [
-    { icon: '💰', label: 'Deposit', href: '/deposit' },
-    { icon: '💸', label: 'Withdraw', href: '/withdraw' },
     { icon: '👑', label: 'VIP Levels', href: '/viplevels' },
     { icon: '🧾', label: 'Transactions', href: '/transactions' },
+    { icon: '💸', label: 'Withdraw', href: '/withdraw' },
+    { icon: '💰', label: 'Deposit', href: '/deposit' },
+    { icon: '🎰', label: 'Magical Wheel', href: '/wheel' },
     { icon: '🎁', label: 'Invite', href: '/invite' },
-    { icon: '🤝', label: 'Myteam', href: '/myteam' },
-    { icon: '📚', label: 'About', href: '/about' },
     { icon: '📲', label: 'Download App', href: '/downloadapp' },
-    { icon: '🎰', label: 'Lucky Wheel', href: '/wheel' },
-    { icon: '💬', label: 'Manager', href: '/manager' }
+    { icon: '🤝', label: 'Team', href: '/myteam' },
+    { icon: '🌍', label: 'About', href: '/about' },
   ]
 
   const isAdmin = normalizePhone(user?.phone) === ADMIN_PHONE
@@ -61,9 +60,8 @@ export default function Dashboard() {
   if (loading) return <div style={{padding:'40px', textAlign:'center', background:'#fff'}}>Loading...</div>
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FFFFFF' }}>
+    <div style={{ minHeight: '100vh', background: '#FFFFFF', position:'relative' }}>
       
-      {/* 1. HEADER HOT GREEN */}
       <h1 style={{
         margin: '0',
         padding: '15px 0 12px',
@@ -77,7 +75,6 @@ export default function Dashboard() {
         BOOKSFORWARD
       </h1>
 
-      {/* 2. IMAGE FULL WIDTH - EDGE TO EDGE */}
       <div style={{
         width: '100vw',
         marginLeft: 'calc(-50vw + 50%)',
@@ -93,10 +90,8 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* 3. CONTENT WITH PADDING */}
-      <main style={{ background: '#FFFFFF', padding: '0 20px 90px', maxWidth:'480px', margin:'0 auto' }}>
+      <main style={{ background: '#FFFFFF', padding: '0 20px 110px', maxWidth:'480px', margin:'0 auto' }}>
 
-        {/* BUTTONS HOT GREEN */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '18px 15px' }}>
           {menuItems.map(item => (
             <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
@@ -119,7 +114,6 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* ADMIN ONLY */}
         {isAdmin && (
           <div onClick={() => router.push('/admin')} style={{
             marginTop:'22px', width:'100%', height:'85px', background:'#111', borderRadius:'14px',
@@ -131,6 +125,29 @@ export default function Dashboard() {
         )}
 
       </main>
+
+      <Link href="/manager" style={{ textDecoration:'none' }}>
+        <div style={{
+          position: 'fixed',
+          bottom: '22px',
+          right: '18px',
+          width: '58px',
+          height: '58px',
+          background: HOT_GREEN,
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '26px',
+          color: '#fff',
+          boxShadow: '0 6px 18px rgba(0,0,0,0.25)',
+          zIndex: 9999,
+          border: '2px solid #fff'
+        }}>
+          🎧
+        </div>
+      </Link>
+
     </div>
   )
 }

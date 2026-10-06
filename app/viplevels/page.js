@@ -115,21 +115,24 @@ export default function VipLevels() {
     try {
       const dateStr = getTodayDateStrFullYear();
       const timeStr = getTodayTimeStrKampala();
-      const isWeekend = isWeekendUganda(); 
+      const isWeekend = isWeekendUganda();
+      const vipData = VIPS[vip.level];
       const res = await fetch('/api/viplevels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phone: user.phone,
-          action: 'BUY_VIP',
+          action: 'UPGRADE',
           payload: {
             vipLevel: vip.level,
             vipName: vip.name,
             price: vip.price,
-            books: 4,
-            dateStr, 
-            timeStr, 
-            assignBooks: !isWeekend 
+            books: vipData.books,
+            daily: vipData.daily,
+            perBook: vipData.perBook,
+            dateStr,
+            timeStr,
+            assignBooks: !isWeekend
           }
         })
       })
@@ -160,18 +163,15 @@ export default function VipLevels() {
     <main style={{ minHeight: '100vh', background: '#FFFFFF', padding: '0', paddingBottom: '90px' }}>
       {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
 
-      {/* HOT GREEN HEADER - VIP LEVELS - GREEN BACK BUTTON - BALANCE REMOVED */}
       <div style={{ background: HOT_GREEN, padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
         <Link href="/dashboard" style={{ width: '36px', height: '36px', background: '#FFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HOT_GREEN, fontSize: '20px', fontWeight: '900', textDecoration: 'none' }}>←</Link>
         <h1 style={{ color: '#FFF', fontSize: '15px', fontWeight: '900', letterSpacing: '1px' }}>VIP LEVELS</h1>
       </div>
 
       <div style={{ padding: '12px', maxWidth: '500px', margin: '0 auto' }}>
-        {/* SUB HEADER INCOME TABLE BLACK */}
         <h2 style={{ fontSize: '13px', fontWeight: '900', color: '#000', margin: '12px 0 4px' }}>INCOME TABLE</h2>
-        <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>6 days a week Mon-Sat</p>
+        <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>6 days / 4 weeks / 12 months</p>
 
-        {/* INCOME TABLE FROM VIPS CONSTANT - HOT GREEN HEADER + BLACK LIGHT TEXT */}
         <div style={{ width: '100%', overflowX: 'auto', marginBottom: '28px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -190,6 +190,9 @@ export default function VipLevels() {
               {[0,1,2,3,4].map(lvl => {
                 const v = VIPS[lvl]
                 const isVip0 = lvl === 0
+                const weekly = v.daily * 6
+                const monthly = weekly * 4
+                const perYear = monthly * 12
                 return (
                   <tr key={lvl}>
                     <td style={tdStyle}>V{lvl}</td>
@@ -197,9 +200,9 @@ export default function VipLevels() {
                     <td style={tdStyle}>{v.books}</td>
                     <td style={tdStyle}>{v.perBook.toLocaleString()}</td>
                     <td style={tdStyle}>{v.daily.toLocaleString()}</td>
-                    <td style={tdStyle}>{isVip0 ? '-' : (v.daily * 6).toLocaleString()}</td>
-                    <td style={tdStyle}>{isVip0 ? '-' : (v.daily * 26).toLocaleString()}</td>
-                    <td style={tdStyle}>{isVip0 ? '-' : (v.daily * 312).toLocaleString()}</td>
+                    <td style={tdStyle}>{isVip0 ? '-' : weekly.toLocaleString()}</td>
+                    <td style={tdStyle}>{isVip0 ? '-' : monthly.toLocaleString()}</td>
+                    <td style={tdStyle}>{isVip0 ? '-' : perYear.toLocaleString()}</td>
                   </tr>
                 )
               })}
@@ -210,7 +213,6 @@ export default function VipLevels() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '420px', margin: '0 auto' }}>
           {vips.map(vip => {
             const isCurrent = currentVipLevel === vip.level
-            const isOwned = currentVipLevel >= vip.level
             const canBuy = vip.level > currentVipLevel
             return (
               <div key={vip.level} style={{

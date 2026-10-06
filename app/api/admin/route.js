@@ -5,107 +5,200 @@ import { Redis } from '@upstash/redis'
 import { NextResponse } from 'next/server'
 
 const redis = Redis.fromEnv()
-const parse = s => typeof s === 'object' ? s : JSON.parse(s || 'null')
+const P = 'bf:'
 
-const dateKey = (p, d = 0) => { 
-  const x = new Date()
-  x.setUTCDate(x.getUTCDate() - d)
-  return `tx:${p}:${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, '0')}-${String(x.getUTCDate()).padStart(2, '0')}` 
+const parse = s => {
+  if (typeof s === 'object') return s
+  try { return JSON.parse(s || 'null') } catch { return null }
+}
+
+const getUgDate = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' })
+const getUgDateTime = () => new Date().toLocaleString('en-CA', { timeZone: 'Africa/Kampala', hour12: false }).replace(',', '').slice(0,19)
+
+const dateKeyUg = (p, offset = 0) => {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Kampala' }))
+  d.setDate(d.getDate() - offset)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${P}tx:${p}:${yyyy}-${mm}-${dd}`
 }
 
 export async function GET(req) {
   try {
-    const a = req.nextUrl.searchParams.get('action'), ph = req.nextUrl.searchParams.get('phone')
+    const a = req.nextUrl.searchParams.get('action')
+    const ph = req.nextUrl.searchParams.get('phone')
 
     if (a === 'pending') {
-      const keys = ph ? [dateKey(ph, 0), dateKey(ph, 1)] : await redis.smembers('admin:pending_txs') || []
+      const keys = ph? [dateKeyUg(ph, 0), dateKeyUg(ph, 1)] : await redis.smembers(`${P}admin:pending_txs`) || []
       let list = []
-
       if (keys.length > 0) {
-        const allLists = await Promise.all(keys.map(k => redis.lrange(k, 0, 199))), deadKeys = []
-
+        const allLists = await Promise.all(keys.map(k => redis.lrange(k, 0, 199)))
+        const deadKeys = []
         keys.forEach((k, idx) => {
-          const parts = String(k || '').split(':'), phKey = ph || parts[1] || '', items = allLists[idx] || []
-          const filtered = items.map(parse).filter(t => t?.status === 'pending').map(t => ({ ...t, phone: t.phone || phKey }))
+          const parts = String(k || '').split(':')
+          const phKey = ph || parts[1] || ''
+          const items = allLists[idx] || []
+          const filtered = items.map(parse).filter(t => t?.status === 'pending').map(t => ({...t, phone: t.phone || phKey }))
           if (!ph && filtered.length === 0) deadKeys.push(k)
           else list.push(...filtered)
         })
-        if (deadKeys.length > 0) await redis.srem('admin:pending_txs', ...deadKeys)
+        if (deadKeys.length > 0) await redis.srem(`${P}admin:pending_txs`,...deadKeys)
       }
       return NextResponse.json({ success: true, pending: list })
     }
 
     if (a === 'user') {
       if (!ph) return NextResponse.json({ success: false, error: 'Phone required' }, { status: 400 })
-      const u = await redis.hgetall(`user:${ph}`)
-      if (!u || !u.phone) return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
-      
+      const u = await redis.hgetall(`${P}user:${ph}`)
+      if (!u ||!u.phone) return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
       try { u.unlockedBooks = JSON.parse(u.unlockedBooks || '[]') } catch { u.unlockedBooks = [] }
       try { u.completedBooks = JSON.parse(u.completedBooks || '[]') } catch { u.completedBooks = [] }
-      u.availableBalance = +u.availableBalance || 0; u.vip = +u.vip || 0
+      u.availableBalance = +u.availableBalance || 0
+      u.vip = +u.vip || 0
       return NextResponse.json({ success: true, user: u })
     }
+
+    // Admin histories that disappear every 24hrs
+    if (a === 'deposit_history') {
+      const today = getUgDate()
+      const items = await redis.lrange(`${P}admin:deposit_history:${today}`, 0, 99)
+      return NextResponse.json({ success: true, history: items.map(parse).filter(Boolean) })
+    }
+    if (a === 'withdraw_history') {
+      const today = getUgDate()
+      const items = await redis.lrange(`${P}admin:withdraw_history:${today}`, 0, 99)
+      return NextResponse.json({ success: true, history: items.map(parse).filter(Boolean) })
+    }
+
     return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 })
   } catch (err) { return NextResponse.json({ success: false, error: err.message }, { status: 500 }) }
 }
 
 export async function POST(req) {
   try {
-    const { action, id, status, password, phone: ph } = await req.json()
+    const { action, id, status, password, phone: ph, amount } = await req.json()
 
     if (action === 'updateStatus') {
-      let key = await redis.hget('tx:lookup', id), p = ph
+      let key = null
+      let p = ph
+
+      // try lookup with bf: prefix
+      const lookupKey = await redis.hget(`${P}tx:lookup`, id)
+      if (lookupKey) key = lookupKey.startsWith(P)? lookupKey : `${P}${lookupKey}`
 
       if (!key && p) {
-        const uKeys = [dateKey(p, 0), dateKey(p, 1)], res = await Promise.all(uKeys.map(k => redis.lrange(k, 0, 199)))
+        const uKeys = [dateKeyUg(p, 0), dateKeyUg(p, 1)]
+        const res = await Promise.all(uKeys.map(k => redis.lrange(k, 0, 199)))
         for (let i = 0; i < 2; i++) { if ((res[i] || []).findIndex(x => parse(x)?.id === id) > -1) { key = uKeys[i]; break; } }
       }
       if (!key) {
-        const activeKeys = await redis.smembers('admin:pending_txs') || [], res = await Promise.all(activeKeys.map(k => redis.lrange(k, 0, 199)))
+        const activeKeys = await redis.smembers(`${P}admin:pending_txs`) || []
+        const res = await Promise.all(activeKeys.map(k => redis.lrange(k, 0, 199)))
         for (let i = 0; i < activeKeys.length; i++) { if ((res[i] || []).findIndex(x => parse(x)?.id === id) > -1) { key = activeKeys[i]; break; } }
       }
 
       if (!key) return NextResponse.json({ success: false, error: `Transaction not found: ${id}` }, { status: 404 })
 
-      const items = await redis.lrange(key, 0, 199) || [], originalItemString = items.find(x => parse(x)?.id === id)
+      const items = await redis.lrange(key, 0, 199) || []
+      const originalItemString = items.find(x => parse(x)?.id === id)
       if (!originalItemString) return NextResponse.json({ success: false, error: 'Transaction missing' }, { status: 404 })
-      
-      const tx = parse(originalItemString)
-      
-      // FIXED: Always fallback to the phone number embedded inside the transaction object itself
-      if (!p) p = tx.phone || key.split(':')[1] || ''
-      if (!p) return NextResponse.json({ success: false, error: 'Could not resolve user phone number' }, { status: 400 })
-      if (tx.status !== 'pending') return NextResponse.json({ success: false, error: 'Transaction already processed' }, { status: 400 })
 
-      const updatedTx = { ...tx, status, updatedAt: String(Date.now()) }, updatedTxString = JSON.stringify(updatedTx)
-      
-      // FIXED: Removed Promise.all here. We must remove the old item BEFORE pushing the new one to prevent list bugs.
+      const tx = parse(originalItemString)
+      if (!p) p = tx.phone || key.split(':')[1] || ''
+      if (!p) return NextResponse.json({ success: false, error: 'Could not resolve phone' }, { status: 400 })
+      if (tx.status!== 'pending') return NextResponse.json({ success: false, error: 'Already processed' }, { status: 400 })
+
+      const updatedTx = {...tx, status, updatedAt: getUgDateTime(), createdAt: tx.createdAt || getUgDateTime() }
+      const updatedTxString = JSON.stringify(updatedTx)
+
+      // UPDATE DAILY KEY
       await redis.lrem(key, 1, originalItemString)
       await redis.lpush(key, updatedTxString)
 
-      const hKey = `tx:${p}:history`, hItems = await redis.lrange(hKey, 0, 399) || [], oldHistoryString = hItems.find(x => parse(x)?.id === id)
+      // UPDATE HISTORY KEY bf:tx:phone:history - creates history in user tx button
+      const hKey = `${P}tx:${p}:history`
+      const hItems = await redis.lrange(hKey, 0, 399) || []
+      const oldHistoryString = hItems.find(x => parse(x)?.id === id)
       if (oldHistoryString) {
         await redis.lrem(hKey, 1, oldHistoryString)
         await redis.lpush(hKey, updatedTxString)
+      } else {
+        // if not in history yet, push it
+        await redis.lpush(hKey, updatedTxString)
       }
 
-      if (!items.map(x => parse(x)?.id === id ? updatedTx : parse(x)).some(t => t?.status === 'pending')) {
-        await redis.srem('admin:pending_txs', key)
-      }
-
+      // Balance
       const amt = +String(tx.amount || 0).replace(/,/g, '')
-      if (status === 'success' && tx.type === 'deposit') await redis.hincrbyfloat(`user:${p}`, 'availableBalance', amt)
-      if (status === 'failed' && tx.type === 'withdraw') await redis.hincrbyfloat(`user:${p}`, 'availableBalance', Math.round(amt / 0.9))
+      if (status === 'success' && tx.type === 'deposit') {
+        await redis.hincrbyfloat(`${P}user:${p}`, 'availableBalance', amt)
+      }
+      if (status === 'failed' && tx.type === 'withdraw') {
+        await redis.hincrbyfloat(`${P}user:${p}`, 'availableBalance', Math.round(amt / 0.9))
+      }
+
+      // Save to admin row history with 24hrs expire
+      const today = getUgDate()
+      if (tx.type === 'deposit') {
+        await redis.lpush(`${P}admin:deposit_history:${today}`, updatedTxString)
+        await redis.expire(`${P}admin:deposit_history:${today}`, 86400)
+      } else {
+        await redis.lpush(`${P}admin:withdraw_history:${today}`, updatedTxString)
+        await redis.expire(`${P}admin:withdraw_history:${today}`, 86400)
+      }
+
+      // Remove from pending
+      await redis.lrem(`${P}pending_tx`, 0, id)
+      await redis.hdel(`${P}tx:lookup`, id)
+
+      const stillPending = (await redis.lrange(key, 0, 199) || []).map(parse).some(t => t?.status === 'pending')
+      if (!stillPending) await redis.srem(`${P}admin:pending_txs`, key)
 
       return NextResponse.json({ success: true })
     }
 
     if (action === 'resetPassword') {
-      if (!ph || !password) return NextResponse.json({ success: false, error: 'Missing data' }, { status: 400 })
-      if (!await redis.hexists(`user:${ph}`, 'phone')) return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
-      await redis.hset(`user:${ph}`, { password })
+      if (!ph ||!password) return NextResponse.json({ success: false, error: 'Missing data' }, { status: 400 })
+      if (!await redis.hexists(`${P}user:${ph}`, 'phone')) return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
+      await redis.hset(`${P}user:${ph}`, { password })
       return NextResponse.json({ success: true })
     }
+
+    // NEW: ADMIN DEPOSIT TO USER - creates system increase
+    if (action === 'adminDeposit') {
+      if (!ph ||!amount) return NextResponse.json({ success: false, error: 'Missing phone/amount' }, { status: 400 })
+      const userKey = `${P}user:${ph}`
+      if (!await redis.hexists(userKey, 'phone')) return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
+
+      const amt = Number(String(amount).replace(/,/g, ''))
+      if (isNaN(amt) || amt <= 0) return NextResponse.json({ success: false, error: 'Invalid amount' }, { status: 400 })
+
+      await redis.hincrbyfloat(userKey, 'availableBalance', amt)
+
+      const dateStr = getUgDate()
+      const timeStr = getUgDateTime()
+      const tx = {
+        id: `tx_${Date.now()}_sys_${Math.random().toString(36).slice(2,6)}`,
+        type: 'system_increase',
+        label: 'System Increase',
+        amount: String(amt),
+        status: 'success',
+        createdAt: timeStr, // YYYY-MM-DD HH:mm:ss Uganda
+        phone: ph,
+        note: 'Admin deposit'
+      }
+      const txStr = JSON.stringify(tx)
+      await redis.lpush(`${P}tx:${ph}:${dateStr}`, txStr)
+      await redis.lpush(`${P}tx:${ph}:history`, txStr) // never delete - user sees in tx history button
+
+      // Also in admin deposit history row - auto clears 24hrs
+      await redis.lpush(`${P}admin:deposit_history:${dateStr}`, txStr)
+      await redis.expire(`${P}admin:deposit_history:${dateStr}`, 86400)
+
+      const user = await redis.hgetall(userKey)
+      return NextResponse.json({ success: true, user })
+    }
+
     return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 })
   } catch (err) { return NextResponse.json({ success: false, error: err.message }, { status: 500 }) }
 }
