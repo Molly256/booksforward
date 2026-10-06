@@ -6,7 +6,7 @@ export default function ManagerPage() {
     { name: "Alicia", phone: "447451296569" }
   ]
 
-  const getWaLink = (phone) => `https://wa.me/${phone}?text=Hello%20Alicia%20-%20Palamedes%20PR`
+  const getWaLink = (phone) => `https://wa.me/${phone}?text=Hello%20Alicia%20-%20BooksForward%20PR`
 
   return (
     <Card>

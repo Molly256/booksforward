@@ -41,7 +41,7 @@ export default function BooksPage() {
   }
 
   useEffect(function() {
-    const userData = JSON.parse(localStorage.getItem('palamedes_user') || '{}')
+    const userData = JSON.parse(localStorage.getItem('booksforward_user') || '{}')
     if (!userData.phone) return
     setUser(userData)
     fetchBooks(userData.phone)
@@ -115,7 +115,7 @@ export default function BooksPage() {
       }
       const newUser = Object.assign({}, user, { availableBalance: data.availableBalance })
       setUser(newUser)
-      localStorage.setItem('palamedes_user', JSON.stringify(newUser))
+      localStorage.setItem('booksforward_user', JSON.stringify(newUser))
     } catch(err) {
       console.error('Submit error:', err)
       alert(err.message || 'Submit failed')

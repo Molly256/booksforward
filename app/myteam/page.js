@@ -8,7 +8,7 @@ export default function MyTeamPage() {
   const [selectedTeam, setSelectedTeam] = useState('A') // Tracks active selected box list view
 
   useEffect(function() {
-    const userData = JSON.parse(localStorage.getItem('palamedes_user') || '{}')
+    const userData = JSON.parse(localStorage.getItem('booksforward_user') || '{}')
     if (!userData.phone) {
       window.location.href = '/login'
       return

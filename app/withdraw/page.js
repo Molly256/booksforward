@@ -12,7 +12,7 @@ export default function Withdraw() {
   const VALID_AMOUNTS = [10000, 50000, 250000, 350000, 500000, 750000, 1000000, 2000000]
 
   useEffect(() => {
-    const localUser = JSON.parse(localStorage.getItem('palamedes_user') || '{}')
+    const localUser = JSON.parse(localStorage.getItem('booksforward_user') || '{}')
     if (!localUser.phone) return router.push('/login')
 
     fetch(`/api/admin?action=user&phone=${localUser.phone}`)
@@ -20,7 +20,7 @@ export default function Withdraw() {
      .then(data => {
         if (data.success) {
           setUser(data.user)
-          localStorage.setItem('palamedes_user', JSON.stringify(data.user))
+          localStorage.setItem('booksforward_user', JSON.stringify(data.user))
         } else { setUser(localUser) }
       }).catch(() => setUser(localUser))
   }, [router])
@@ -109,7 +109,7 @@ export default function Withdraw() {
       // Deduct the EXACT total amount user entered from their live wallet balance instantly
       const updatedUser = { ...user, availableBalance: Number(user.availableBalance || 0) - amt }
       setUser(updatedUser)
-      localStorage.setItem('palamedes_user', JSON.stringify(updatedUser))
+      localStorage.setItem('booksforward_user', JSON.stringify(updatedUser))
 
       alert('withdraw success')
       router.push('/transactions')

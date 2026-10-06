@@ -92,7 +92,7 @@ export default function Register() {
           phone: form.phone,
           inviteCode: data.inviteCode
         }
-        localStorage.setItem('palamedes_user', JSON.stringify(userSession))
+        localStorage.setItem('booksforward_user', JSON.stringify(userSession))
         
         sessionStorage.removeItem('activeInviterCode') 
         sessionStorage.removeItem('referrer_code')

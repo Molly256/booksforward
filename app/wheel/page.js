@@ -18,7 +18,7 @@ export default function LuckyWheelPage() {
   useEffect(() => {
     async function fetchUserData() {
       try {
-        const storedUser = localStorage.getItem('palamedes_user');
+        const storedUser = localStorage.getItem('booksforward_user');
         if (!storedUser) {
           setLoading(false);
           return;
@@ -116,7 +116,7 @@ export default function LuckyWheelPage() {
         letterSpacing: '1px',
         textAlign: 'center'
       }}>
-        PALAMEDES-PR COMPANY LUCKY WHEEL
+        BooksForward-PR COMPANY LUCKY WHEEL
       </h1>
       
       <div style={{ display: 'flex', gap: '20px', marginBottom: '30px' }}>

@@ -50,7 +50,7 @@ export default function Login() {
       }
 
       if (data && data.user) {
-        localStorage.setItem('palamedes_user', JSON.stringify(data.user))
+        localStorage.setItem('booksforward_user', JSON.stringify(data.user))
         router.push('/dashboard')
       } else {
         alert('Server returned an incomplete user session. Please try again.')

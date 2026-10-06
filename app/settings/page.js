@@ -25,7 +25,7 @@ function SettingsContent() {
     if (typeof window === "undefined") return;
 
     // 1. Instantly pull whatever data we already have from memory
-    const saved = JSON.parse(localStorage.getItem('palamedes_user') || '{}');
+    const saved = JSON.parse(localStorage.getItem('booksforward_user') || '{}');
     const phone = saved.phone || "";
     setUserPhone(phone);
     
@@ -50,7 +50,7 @@ function SettingsContent() {
             setAvatarUrl(data.user.avatar || "");
             
             const updatedCache = { ...saved, ...data.user };
-            localStorage.setItem('palamedes_user', JSON.stringify(updatedCache));
+            localStorage.setItem('booksforward_user', JSON.stringify(updatedCache));
           }
         }
       } catch (err) { 
@@ -72,9 +72,9 @@ function SettingsContent() {
         setUsername(newUsername); 
         setIsEditingUsername(false); 
         
-        const saved = JSON.parse(localStorage.getItem('palamedes_user') || '{}');
+        const saved = JSON.parse(localStorage.getItem('booksforward_user') || '{}');
         saved.username = newUsername;
-        localStorage.setItem('palamedes_user', JSON.stringify(saved));
+        localStorage.setItem('booksforward_user', JSON.stringify(saved));
       }
     } catch (err) { alert("Error saving username"); }
   };
@@ -123,9 +123,9 @@ function SettingsContent() {
         if (response.ok) {
           setAvatarUrl(base64String);
           
-          const saved = JSON.parse(localStorage.getItem('palamedes_user') || '{}');
+          const saved = JSON.parse(localStorage.getItem('booksforward_user') || '{}');
           saved.avatar = base64String;
-          localStorage.setItem('palamedes_user', JSON.stringify(saved));
+          localStorage.setItem('booksforward_user', JSON.stringify(saved));
         } else {
           alert("Failed to save selected image");
         }
@@ -180,7 +180,7 @@ function SettingsContent() {
           React.createElement("div", { className: "flex justify-end pt-2" }, React.createElement("button", { onClick: handleSavePassword, className: skyBlueBtnClass }, "Save Password"))
         )
       ),
-      React.createElement("div", { className: "pt-6 flex justify-center" }, React.createElement("button", { onClick: () => {localStorage.removeItem('palamedes_user'); window.location.href='/login'}, className: skyBlueBtnClass + " px-12" }, "Logout"))
+      React.createElement("div", { className: "pt-6 flex justify-center" }, React.createElement("button", { onClick: () => {localStorage.removeItem('booksforward_user'); window.location.href='/login'}, className: skyBlueBtnClass + " px-12" }, "Logout"))
     )
   );
 }

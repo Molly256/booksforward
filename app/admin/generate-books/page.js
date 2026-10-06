@@ -10,7 +10,7 @@ export default function GenerateBooks() {
   const ADMIN_PHONE = '0753520252'
 
   const runGenerate = async () => {
-    const localUser = JSON.parse(localStorage.getItem('palamedes_user') || '{}')
+    const localUser = JSON.parse(localStorage.getItem('booksforward_user') || '{}')
     if (localUser.phone !== ADMIN_PHONE) {
       router.push('/dashboard')
       return

@@ -15,7 +15,7 @@ export default function Deposit() {
   }
 
   useEffect(() => {
-    const localUser = JSON.parse(localStorage.getItem('palamedes_user') || '{}')
+    const localUser = JSON.parse(localStorage.getItem('booksforward_user') || '{}')
     if (!localUser.phone) {
       router.push('/login')
       return

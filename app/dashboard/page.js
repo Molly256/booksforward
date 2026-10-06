@@ -10,7 +10,7 @@ export default function Dashboard() {
   const [user, setUser] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
-        const cached = localStorage.getItem('booksforward_user') || localStorage.getItem('palamedes_user')
+        const cached = localStorage.getItem('booksforward_user') || localStorage.getItem('booksforward_user')
         return cached ? JSON.parse(cached) : null
       } catch { return null }
     }
@@ -26,7 +26,7 @@ export default function Dashboard() {
   }
   const loadUser = async () => {
     if (typeof window === 'undefined') return
-    const cachedData = localStorage.getItem('booksforward_user') || localStorage.getItem('palamedes_user')
+    const cachedData = localStorage.getItem('booksforward_user') || localStorage.getItem('booksforward_user')
     let localUser = null
     try { if (cachedData) localUser = JSON.parse(cachedData) } catch { localUser = null }
     if (!localUser && !user) { setLoading(false); router.replace('/register'); return }

@@ -7,7 +7,7 @@ export default function InvitePage() {
 
   useEffect(() => {
     try {
-      const cached = localStorage.getItem('palamedes_user')
+      const cached = localStorage.getItem('booksforward_user')
       if (cached) {
         const parsedData = JSON.parse(cached)
         if (parsedData && parsedData.user) {
@@ -25,7 +25,7 @@ export default function InvitePage() {
   const getInviteLink = () => {
     const code = user?.inviteCode || user?.invite_code
     if (!code) return 'Loading your code...'
-    return 'https://www.palamedes-pr.co.uk/r/' + code
+    return 'https://www.BooksForward-pr.co.uk/r/' + code
   }
 
   const handleCopy = async () => {

@@ -9,8 +9,8 @@ export async function GET(request) {
       return NextResponse.json({ // <-- Use NextResponse not Response
         success: true,
         data: {
-          title: 'About Palamedes',
-          content: 'Palamedes is a daily task earning platform. Complete books Mon-Fri, earn money, upgrade VIP for higher income.',
+          title: 'About BooksForward',
+          content: 'BooksForward is a daily task earning platform. Complete books Mon-Fri, earn money, upgrade VIP for higher income.',
           version: '1.0.0'
         }
       })

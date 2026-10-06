@@ -22,13 +22,13 @@ export default function DownloadApp() {
       if (outcome === 'accepted') setDeferredPrompt(null)
     } else {
       // Fallback: If the browser isn't ready yet, trigger the manual browser action menu directly
-      alert('To install Palamedes:\n\nTap your browser menu (the 3 dots ⋮ in the top right corner) and click "Install app" or "Add to Home screen".')
+      alert('To install BooksForward:\n\nTap your browser menu (the 3 dots ⋮ in the top right corner) and click "Install app" or "Add to Home screen".')
     }
   }
 
   return (
     <main style={{ padding: '40px 20px', textAlign: 'center', fontFamily: 'sans-serif' }}>
-      <h1 style={{ fontSize: '28px', marginBottom: '16px' }}>Install Palamedes App</h1>
+      <h1 style={{ fontSize: '28px', marginBottom: '16px' }}>Install BooksForward App</h1>
       <p style={{ fontSize: '16px', color: '#555', marginBottom: '32px' }}>
         Install our official app for faster withdrawals, account checks, and offline support.
       </p>
