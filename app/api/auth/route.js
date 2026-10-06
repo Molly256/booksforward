@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic'
 
 import { Redis } from '@upstash/redis'
 import { NextResponse } from 'next/server'
-import crypto from 'crypto'
 
 const redis = Redis.fromEnv()
 
@@ -11,15 +10,11 @@ const toNum = function(v, f) {
   if (f === undefined) f = 0
   if (v === undefined || v === null) return f
   const n = Number(v)
-  return Number.isNaN(n) ? f : n
+  return Number.isNaN(n)? f : n
 }
 
 const getUgandanFullDate = function() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' })
-}
-
-const getUgandanDateTimeString = function() {
-  return new Date().toLocaleString("en-CA", { timeZone: "Africa/Kampala", hour12: false }).slice(0,16).replace(',', ' ')
 }
 
 export async function POST(req) {
@@ -29,9 +24,9 @@ export async function POST(req) {
     const username = body.username
     const phone = body.phone
     const password = body.password
-    const inviterCode = body.inviterCode 
-    const referrerCode = inviterCode 
-    
+    const inviterCode = body.inviterCode
+    const referrerCode = inviterCode
+
     if (action === 'register') {
       if (!/^[a-zA-Z0-9]{6}$/.test(username)) {
         return NextResponse.json({ error: 'Username must be 6 alphanumeric chars' }, { status: 400 })
@@ -42,55 +37,53 @@ export async function POST(req) {
       if (!/^[a-zA-Z0-9]{6}$/.test(password)) {
         return NextResponse.json({ error: 'Password must be 6 alphanumeric chars' }, { status: 400 })
       }
-      
-      // 🛑 INVITE CODE MANDATORY RESTRICTION CHECK
-      if (!referrerCode || !/^PM\d{6}$/.test(referrerCode)) {
+
+      if (!referrerCode ||!/^\d{6}BF$/.test(referrerCode)) {
         return NextResponse.json({ error: 'Valid invite code required' }, { status: 400 })
       }
 
-      const userKey = 'user:' + String(phone).trim()
+      const userKey = 'bf:user:' + String(phone).trim()
       const exists = await redis.hget(userKey, 'phone')
-      
+
       if (exists) {
         return NextResponse.json({ error: 'Phone already registered' }, { status: 400 })
       }
 
-      const inviteCode = 'PM' + String(phone).slice(-6)
-      const date = getUgandanFullDate() 
-      const timeStr = getUgandanDateTimeString()
+      const inviteCode = String(phone).slice(-6) + 'BF'
+      const date = getUgandanFullDate()
       const pipeline = redis.pipeline()
 
       let directInviterPhone = null
 
-      if (referrerCode && /^PM\d{6}$/.test(referrerCode)) {
-        directInviterPhone = await redis.get('invite_code_map:' + referrerCode) 
-        
-        if (directInviterPhone && String(directInviterPhone) !== String(phone)) {
+      if (referrerCode && /^\d{6}BF$/.test(referrerCode)) {
+        directInviterPhone = await redis.get('bf:invite_code_map:' + referrerCode)
+
+        if (directInviterPhone && String(directInviterPhone)!== String(phone)) {
           const cleanInviter = String(directInviterPhone).trim()
           const newUserPhoneKey = String(phone).trim()
-          
-          const parentData = await redis.hget('user:' + cleanInviter, 'invited_by')
-          const grandparentPhone = parentData ? String(parentData).trim() : null
-          
+
+          const parentData = await redis.hget('bf:user:' + cleanInviter, 'invited_by')
+          const grandparentPhone = parentData? String(parentData).trim() : null
+
           let greatGrandparentPhone = null
           if (grandparentPhone) {
-            const grandData = await redis.hget('user:' + grandparentPhone, 'invited_by')
-            greatGrandparentPhone = grandData ? String(grandData).trim() : null
+            const grandData = await redis.hget('bf:user:' + grandparentPhone, 'invited_by')
+            greatGrandparentPhone = grandData? String(grandData).trim() : null
           }
 
           const dataA = {}
           dataA[newUserPhoneKey] = '1'
-          pipeline.hset('downlines:' + cleanInviter, dataA)
+          pipeline.hset('bf:downlines:' + cleanInviter, dataA)
 
-          if (grandparentPhone && grandparentPhone !== newUserPhoneKey) {
+          if (grandparentPhone && grandparentPhone!== newUserPhoneKey) {
             const dataB = {}
             dataB[newUserPhoneKey] = '2'
-            pipeline.hset('downlines:' + grandparentPhone, dataB)
+            pipeline.hset('bf:downlines:' + grandparentPhone, dataB)
 
-            if (greatGrandparentPhone && greatGrandparentPhone !== newUserPhoneKey) {
+            if (greatGrandparentPhone && greatGrandparentPhone!== newUserPhoneKey) {
               const dataC = {}
               dataC[newUserPhoneKey] = '3'
-              pipeline.hset('downlines:' + greatGrandparentPhone, dataC)
+              pipeline.hset('bf:downlines:' + greatGrandparentPhone, dataC)
             }
           }
         }
@@ -100,67 +93,47 @@ export async function POST(req) {
         username: String(username),
         phone: String(phone),
         password: String(password),
-        inviteCode: String(inviteCode), 
-        availableBalance: '2500',
+        inviteCode: String(inviteCode),
+        availableBalance: '0',
         vip: '0',
         books_read_today: '0',
         dailyIncome: '0',
         completedBooks: '[]',
         unlockedBooks: '[]',
         lastResetDate: String(date),
-        createdAt: String(date) 
-      }
-
-      if (directInviterPhone && String(directInviterPhone) !== String(phone)) {
-        userProfile.invited_by = String(directInviterPhone).trim()
-      } else {
-        userProfile.invited_by = ''
+        createdAt: String(date),
+        invited_by: directInviterPhone && String(directInviterPhone)!== String(phone)? String(directInviterPhone).trim() : ''
       }
 
       pipeline.hset(userKey, userProfile)
-      pipeline.set('invite_code_map:' + inviteCode, String(phone).trim()) 
-
-      const txPayload = JSON.stringify({
-        id: crypto.randomUUID(),
-        type: 'system_increase', 
-        label: 'Registration Reward', 
-        amount: '2500',
-        note: 'Registration Reward',
-        status: 'success', 
-        createdAt: timeStr
-      });
-
-      pipeline.lpush('tx:' + String(phone).trim() + ':' + date, txPayload)
-      pipeline.lpush('tx:' + String(phone).trim() + ':history', txPayload)
+      pipeline.set('bf:invite_code_map:' + inviteCode, String(phone).trim())
 
       await pipeline.exec()
-      return NextResponse.json({ success: true, inviteCode: inviteCode }) 
+      return NextResponse.json({ success: true, inviteCode: inviteCode })
     }
 
     if (action === 'login') {
-      if (!/^07\d{8}$/.test(phone) || !password) {
+      if (!/^07\d{8}$/.test(phone) ||!password) {
         return NextResponse.json({ error: 'Invalid phone or password' }, { status: 400 })
       }
 
-      const userKey = 'user:' + String(phone).trim()
+      const userKey = 'bf:user:' + String(phone).trim()
       const user = await redis.hgetall(userKey)
 
-      if (!user || Object.keys(user).length === 0 || !user.phone) {
+      if (!user || Object.keys(user).length === 0 ||!user.phone) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 })
       }
 
-      if (String(user.password) !== String(password)) {
+      if (String(user.password)!== String(password)) {
         return NextResponse.json({ error: 'Wrong password' }, { status: 401 })
       }
 
-      const currentDate = getUgandanFullDate() 
+      const currentDate = getUgandanFullDate()
+      const rawDownlines = await redis.hgetall('bf:downlines:' + String(phone).trim()) || {}
 
-      const rawDownlines = await redis.hgetall('downlines:' + String(phone).trim()) || {}
-      
       let teamACount = 0
       let teamBCount = 0
       let teamCCount = 0
-
       const keys = Object.keys(rawDownlines);
       for (let i = 0; i < keys.length; i++) {
         const val = rawDownlines[keys[i]];
@@ -172,9 +145,9 @@ export async function POST(req) {
       const safeUser = {
         username: String(user.username),
         phone: String(user.phone),
-        inviteCode: String(user.inviteCode || ''), 
+        inviteCode: String(user.inviteCode || ''),
         vip: toNum(user.vip),
-        availableBalance: toNum(user.availableBalance, 2500),
+        availableBalance: toNum(user.availableBalance, 0),
         books_read_today: toNum(user.books_read_today),
         dailyIncome: toNum(user.dailyIncome),
         createdAt: String(user.createdAt || currentDate),

@@ -31,7 +31,6 @@ export default function Login() {
     }
 
     try {
-      // FIXED: Strictly calls /api/auth to verify system credentials
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -45,7 +44,6 @@ export default function Login() {
       const data = await res.json()
 
       if (!res.ok) {
-        // FIXED: Reads data.error to match your /api/auth backend file structure
         alert(data.error || 'Authentication failed')
         lockRef.current = false 
         return
@@ -53,8 +51,6 @@ export default function Login() {
 
       if (data && data.user) {
         localStorage.setItem('palamedes_user', JSON.stringify(data.user))
-
-        // FIXED: Forced admin redirect is removed. Everyone lands on the dashboard!
         router.push('/dashboard')
       } else {
         alert('Server returned an incomplete user session. Please try again.')
@@ -129,9 +125,9 @@ export default function Login() {
               height: '44px',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: '#87CEEB',
-              color: '#000',
-              fontWeight: '500',
+              backgroundColor: '#FF8C00',
+              color: '#fff',
+              fontWeight: '700',
               fontSize: '16px',
               cursor: 'pointer',
               marginTop: '4px'
@@ -142,7 +138,7 @@ export default function Login() {
         </form>
         
         <p style={{ textAlign: 'center', fontSize: '15px', color: '#000', marginTop: '16px' }}>
-          Don't have an account? <a href="/register" style={{ color: '#00BFFF', textDecoration: 'underline', fontWeight: '700' }}>Register</a>
+          Don't have an account? <a href="/register" style={{ color: '#FF8C00', textDecoration: 'underline', fontWeight: '700' }}>Register</a>
         </p>
       </div>
     </div>

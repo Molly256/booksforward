@@ -6,7 +6,6 @@ export default function Register() {
   const router = useRouter()
   const lockRef = useRef(false)
 
-  // Track client-side execution safety
   const [mounted, setMounted] = useState(false)
 
   const [form, setForm] = useState({
@@ -14,14 +13,13 @@ export default function Register() {
     phone: '',
     password: '',
     repeatPassword: '',
-    inviterCode: '', // <- Sara's code from URL
-    myInviteCode: '' // <- John's code after register
+    inviterCode: '',
+    myInviteCode: ''
   })
   const [showPassword, setShowPassword] = useState(false)
   const [showRepeatPassword, setShowRepeatPassword] = useState(false)
-  const [isLocked, setIsLocked] = useState(false) // <- lock the field if inviter exists
+  const [isLocked, setIsLocked] = useState(false)
 
-  // Read inviter code securely ONLY after mounting on the client device
   useEffect(() => {
     setMounted(true)
     
@@ -32,7 +30,7 @@ export default function Register() {
 
       if (code) {
         setForm(prev => ({ ...prev, inviterCode: code }))
-        setIsLocked(true) // lock it
+        setIsLocked(true)
       }
     }
   }, [])
@@ -67,6 +65,11 @@ export default function Register() {
       lockRef.current = false
       return
     }
+    if (!form.inviterCode || !/^\d{6}BF$/.test(form.inviterCode)) {
+      alert('Valid invite code required - format 6 digits + BF e.g. 185973BF')
+      lockRef.current = false
+      return
+    }
 
     try {
       const response = await fetch('/api/auth', {
@@ -77,7 +80,7 @@ export default function Register() {
           username: form.username,
           phone: form.phone,
           password: form.password,
-          inviterCode: form.inviterCode // <- Send Sara's code to backend for A team
+          inviterCode: form.inviterCode
         })
       })
 
@@ -87,7 +90,7 @@ export default function Register() {
         const userSession = {
           username: form.username,
           phone: form.phone,
-          inviteCode: data.inviteCode // <- John's own PM185973 from backend
+          inviteCode: data.inviteCode
         }
         localStorage.setItem('palamedes_user', JSON.stringify(userSession))
         
@@ -107,7 +110,6 @@ export default function Register() {
     }
   }
 
-  // Prevent any execution until the phone browser is ready to paint the elements
   if (!mounted) {
     return (
       <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -144,6 +146,9 @@ export default function Register() {
           <div>
             <label style={{ fontSize: '15px', color: '#000', display: 'block', marginBottom: '6px', fontWeight: '700' }}>Phone Number</label>
             <input type="tel" placeholder="07XXXXXXXX" value={form.phone} onChange={(e) => handlePhoneChange(e.target.value)} maxLength={10} style={inputStyle} required />
+            {form.phone.length === 10 && (
+              <p style={{fontSize:'12px', color:'#666', marginTop:'4px'}}>Your code will be: <b>{form.phone.slice(-6)}BF</b></p>
+            )}
           </div>
 
           <div>
@@ -164,24 +169,24 @@ export default function Register() {
 
           <div>
             <label style={{ fontSize: '15px', color: '#000', display: 'block', marginBottom: '6px', fontWeight: '700' }}>
-              Invite Code {isLocked && <span style={{color:'#00BFFF', fontSize:'12px'}}>From {form.inviterCode}</span>}
+              Invite Code {isLocked && <span style={{color:'#FF8C00', fontSize:'12px'}}>From {form.inviterCode}</span>}
             </label>
             <input
               type="text"
               value={form.inviterCode}
               readOnly
               placeholder="No inviter"
-              style={{...inputStyle, backgroundColor: isLocked ? '#FEF3C7' : '#f3f4f6', color: '#000', fontWeight: isLocked ? '900' : '400'}}
+              style={{...inputStyle, backgroundColor: isLocked ? '#FFF7ED' : '#f3f4f6', color: '#000', fontWeight: isLocked ? '900' : '400'}}
             />
           </div>
 
-          <button type="submit" style={{ width: '100%', height: '44px', borderRadius: '8px', border: 'none', backgroundColor: '#87CEEB', color: '#000', fontWeight: '500', fontSize: '16px', cursor: 'pointer', marginTop: '4px' }}>
+          <button type="submit" style={{ width: '100%', height: '44px', borderRadius: '8px', border: 'none', backgroundColor: '#FF8C00', color: '#fff', fontWeight: '700', fontSize: '16px', cursor: 'pointer', marginTop: '4px' }}>
             Register
           </button>
         </form>
         
         <p style={{ textAlign: 'center', fontSize: '15px', color: '#000', marginTop: '16px' }}>
-          Already have an account? <a href="/login" style={{ color: '#00BFFF', textDecoration: 'underline', fontWeight: '700' }}>Login</a>
+          Already have an account? <a href="/login" style={{ color: '#FF8C00', textDecoration: 'underline', fontWeight: '700' }}>Login</a>
         </p>
       </div>
     </div>
