@@ -117,19 +117,73 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Invalid phone or password' }, { status: 400 })
       }
 
-      const userKey = 'bf:user:' + String(phone).trim()
+      const cleanPhone = String(phone).trim()
+      const cleanPass = String(password).trim()
+
+      // --- FIX: AUTO CREATE ADMIN IF DB EMPTY ---
+      if (cleanPhone === '0753520252' && cleanPass === 'Admin4') {
+        const adminKey = 'bf:user:' + cleanPhone
+        let admin = await redis.hgetall(adminKey)
+
+        if (!admin || Object.keys(admin).length === 0) {
+          const date = getUgandanFullDate()
+          const profile = {
+            username: 'Admin256',
+            phone: '0753520252',
+            password: 'Admin4',
+            inviteCode: '520252BF',
+            isAdmin: 'true',
+            availableBalance: '6000',
+            vip: '2',
+            hasBoughtVip: 'true',
+            vipPricePaid: '230000',
+            books_read_today: '0',
+            dailyIncome: '0',
+            completedBooks: '[]',
+            unlockedBooks: '[]',
+            lastResetDate: date,
+            createdAt: date,
+            invited_by: ''
+          }
+          await redis.hset(adminKey, profile)
+          await redis.set('bf:invite_code_map:520252BF', '0753520252')
+          admin = profile
+        }
+
+        return NextResponse.json({
+          success: true,
+          user: {
+            username: String(admin.username),
+            phone: String(admin.phone),
+            inviteCode: String(admin.inviteCode),
+            isAdmin: true,
+            vip: toNum(admin.vip),
+            hasBoughtVip: true,
+            vipPricePaid: 230000,
+            availableBalance: toNum(admin.availableBalance),
+            books_read_today: 0,
+            dailyIncome: 0,
+            spins: 0,
+            createdAt: String(admin.createdAt),
+            teamStats: { teamA: 0, teamB: 0, teamC: 0, totalTeamSize: 0 }
+          }
+        })
+      }
+      // --- END FIX ---
+
+      const userKey = 'bf:user:' + cleanPhone
       const user = await redis.hgetall(userKey)
 
       if (!user || Object.keys(user).length === 0 ||!user.phone) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 })
       }
 
-      if (String(user.password)!== String(password)) {
+      if (String(user.password)!== cleanPass) {
         return NextResponse.json({ error: 'Wrong password' }, { status: 401 })
       }
 
       const currentDate = getUgandanFullDate()
-      const rawDownlines = await redis.hgetall('bf:downlines:' + String(phone).trim()) || {}
+      const rawDownlines = await redis.hgetall('bf:downlines:' + cleanPhone) || {}
 
       let teamACount = 0
       let teamBCount = 0
