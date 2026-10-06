@@ -45,7 +45,9 @@ export async function GET(req) {
         })
         if (deadKeys.length > 0) await redis.srem(`${P}admin:pending_txs`,...deadKeys)
       }
-      return NextResponse.json({ success: true, pending: list }, { headers: { 'Cache-Control': 'no-store' } })
+      const seen = new Set()
+      const deduped = list.filter(t=>{ if(!t?.id || seen.has(t.id)) return false; seen.add(t.id); return true })
+      return NextResponse.json({ success: true, pending: deduped }, { headers: { 'Cache-Control': 'no-store' } })
     }
 
     if (a === 'user') {
@@ -62,12 +64,18 @@ export async function GET(req) {
     if (a === 'deposit_history') {
       const today = getUgDate()
       const items = await redis.lrange(`${P}admin:deposit_history:${today}`, 0, 99)
-      return NextResponse.json({ success: true, history: items.map(parse).filter(Boolean) })
+      const parsed = items.map(parse).filter(Boolean)
+      const seen = new Set()
+      const deduped = parsed.filter(t=>{ if(!t?.id || seen.has(t.id)) return false; seen.add(t.id); return true })
+      return NextResponse.json({ success: true, history: deduped })
     }
     if (a === 'withdraw_history') {
       const today = getUgDate()
       const items = await redis.lrange(`${P}admin:withdraw_history:${today}`, 0, 99)
-      return NextResponse.json({ success: true, history: items.map(parse).filter(Boolean) })
+      const parsed = items.map(parse).filter(Boolean)
+      const seen = new Set()
+      const deduped = parsed.filter(t=>{ if(!t?.id || seen.has(t.id)) return false; seen.add(t.id); return true })
+      return NextResponse.json({ success: true, history: deduped })
     }
 
     return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 })
@@ -79,86 +87,89 @@ export async function POST(req) {
     const { action, id, status, password, phone: ph, amount } = await req.json()
 
     if (action === 'updateStatus') {
-      let key = null
-      let p = ph
+      if(!id) return NextResponse.json({ success: false, error: 'Missing id' }, { status: 400 })
 
-      const lookupKey = await redis.hget(`${P}tx:lookup`, id)
-      if (lookupKey) key = lookupKey.startsWith(P)? lookupKey : `${P}${lookupKey}`
+      // LOCK 10s - stops double tap creating double history
+      const lockKey = `${P}lock:tx:${id}`
+      const gotLock = await redis.set(lockKey, '1', { nx: true, ex: 15 })
+      if(!gotLock) return NextResponse.json({ success: false, error: 'Processing, please wait' }, { status: 429 })
 
-      if (!key && p) {
-        const uKeys = [dateKeyUg(p, 0), dateKeyUg(p, 1)]
-        const res = await Promise.all(uKeys.map(k => redis.lrange(k, 0, 199)))
-        for (let i = 0; i < 2; i++) { if ((res[i] || []).findIndex(x => parse(x)?.id === id) > -1) { key = uKeys[i]; break; } }
+      try {
+        let key = null
+        let p = ph
+
+        const lookupKey = await redis.hget(`${P}tx:lookup`, id)
+        if (lookupKey) key = lookupKey.startsWith(P)? lookupKey : `${P}${lookupKey}`
+
+        if (!key && p) {
+          const uKeys = [dateKeyUg(p, 0), dateKeyUg(p, 1)]
+          const res = await Promise.all(uKeys.map(k => redis.lrange(k, 0, 199)))
+          for (let i = 0; i < 2; i++) { if ((res[i] || []).findIndex(x => parse(x)?.id === id) > -1) { key = uKeys[i]; break; } }
+        }
+        if (!key) {
+          const activeKeys = await redis.smembers(`${P}admin:pending_txs`) || []
+          const res = await Promise.all(activeKeys.map(k => redis.lrange(k, 0, 199)))
+          for (let i = 0; i < activeKeys.length; i++) { if ((res[i] || []).findIndex(x => parse(x)?.id === id) > -1) { key = activeKeys[i]; break; } }
+        }
+
+        if (!key) return NextResponse.json({ success: false, error: `Transaction not found: ${id}` }, { status: 404 })
+
+        const items = await redis.lrange(key, 0, 199) || []
+        const originalItemString = items.find(x => parse(x)?.id === id)
+        if (!originalItemString) return NextResponse.json({ success: false, error: 'Transaction missing' }, { status: 404 })
+
+        const tx = parse(originalItemString)
+        if (!p) p = tx.phone || key.split(':')[1] || ''
+        if (!p) return NextResponse.json({ success: false, error: 'Could not resolve phone' }, { status: 400 })
+        if (tx.status!== 'pending') return NextResponse.json({ success: false, error: 'Already processed' }, { status: 400 })
+
+        const finalStatus = String(status).toLowerCase() === 'completed'? 'success' : String(status).toLowerCase()
+        const now = getUgDateTime()
+        const updatedTx = {...tx, status: finalStatus, updatedAt: now, createdAt: String(tx.createdAt || now).slice(0,19), timestamp: String(tx.createdAt || now).slice(0,19)}
+        const updatedTxString = JSON.stringify(updatedTx)
+
+        // DAILY - rebuild without this id, then push once (no double)
+        const dailyFiltered = items.filter(x => parse(x)?.id!== id)
+        await redis.del(key)
+        if(dailyFiltered.length>0){ for(const s of dailyFiltered.reverse()) await redis.lpush(key, s) }
+        await redis.lpush(key, updatedTxString)
+
+        // HISTORY - rebuild without this id, then push once (NO DOUBLE USER HISTORY)
+        const hKey = `${P}tx:${p}:history`
+        const hItems = await redis.lrange(hKey, 0, 500) || []
+        const hFiltered = hItems.filter(x => parse(x)?.id!== id)
+        await redis.del(hKey)
+        for(const s of hFiltered.reverse()) await redis.lpush(hKey, s)
+        await redis.lpush(hKey, updatedTxString)
+
+        // BALANCE + ADMIN HISTORY - only if not already in admin history
+        const today = getUgDate()
+        const histKey = tx.type === 'deposit'? `${P}admin:deposit_history:${today}` : `${P}admin:withdraw_history:${today}`
+        const existing = (await redis.lrange(histKey, 0, 99)).map(parse)
+        const alreadyExists = existing.some(t=>t?.id===id)
+
+        if(!alreadyExists){
+          const amt = +String(tx.amount || 0).replace(/,/g, '')
+          if (finalStatus === 'success' && tx.type === 'deposit') {
+            await redis.hincrbyfloat(`${P}user:${p}`, 'availableBalance', amt)
+          }
+          if (finalStatus === 'failed' && tx.type === 'withdraw') {
+            await redis.hincrbyfloat(`${P}user:${p}`, 'availableBalance', Math.round(amt / 0.9))
+          }
+          await redis.lpush(histKey, updatedTxString)
+          await redis.expire(histKey, 86400)
+        }
+
+        await redis.lrem(`${P}pending_tx`, 0, id)
+        await redis.hdel(`${P}tx:lookup`, id)
+
+        const stillPending = (await redis.lrange(key, 0, 199) || []).map(parse).some(t => t?.status === 'pending')
+        if (!stillPending) await redis.srem(`${P}admin:pending_txs`, key)
+
+        return NextResponse.json({ success: true, transaction: updatedTx })
+      } finally {
+        await redis.del(lockKey)
       }
-      if (!key) {
-        const activeKeys = await redis.smembers(`${P}admin:pending_txs`) || []
-        const res = await Promise.all(activeKeys.map(k => redis.lrange(k, 0, 199)))
-        for (let i = 0; i < activeKeys.length; i++) { if ((res[i] || []).findIndex(x => parse(x)?.id === id) > -1) { key = activeKeys[i]; break; } }
-      }
-
-      if (!key) return NextResponse.json({ success: false, error: `Transaction not found: ${id}` }, { status: 404 })
-
-      const items = await redis.lrange(key, 0, 199) || []
-      const originalItemString = items.find(x => parse(x)?.id === id)
-      if (!originalItemString) return NextResponse.json({ success: false, error: 'Transaction missing' }, { status: 404 })
-
-      const tx = parse(originalItemString)
-      if (!p) p = tx.phone || key.split(':')[1] || ''
-      if (!p) return NextResponse.json({ success: false, error: 'Could not resolve phone' }, { status: 400 })
-      if (tx.status!== 'pending') return NextResponse.json({ success: false, error: 'Already processed' }, { status: 400 })
-
-      // FIXED: normalize status + keep full YYYY-MM-DD HH:mm:ss
-      const finalStatus = String(status).toLowerCase() === 'completed'? 'success' : String(status).toLowerCase()
-      const now = getUgDateTime()
-      const updatedTx = {
-       ...tx,
-        status: finalStatus,
-        updatedAt: now,
-        createdAt: String(tx.createdAt || now).slice(0,19),
-        timestamp: String(tx.createdAt || now).slice(0,19)
-      }
-      const updatedTxString = JSON.stringify(updatedTx)
-
-      // UPDATE DAILY KEY
-      await redis.lrem(key, 1, originalItemString)
-      await redis.lpush(key, updatedTxString)
-
-      // UPDATE HISTORY KEY - this is what user sees, MUST update
-      const hKey = `${P}tx:${p}:history`
-      const hItems = await redis.lrange(hKey, 0, 500) || []
-      const oldHistoryString = hItems.find(x => parse(x)?.id === id)
-      if (oldHistoryString) {
-        await redis.lrem(hKey, 1, oldHistoryString)
-      }
-      await redis.lpush(hKey, updatedTxString)
-
-      // BALANCE LOGIC
-      const amt = +String(tx.amount || 0).replace(/,/g, '')
-      if (finalStatus === 'success' && tx.type === 'deposit') {
-        await redis.hincrbyfloat(`${P}user:${p}`, 'availableBalance', amt)
-      }
-      if (finalStatus === 'failed' && tx.type === 'withdraw') {
-        // refund gross with fee
-        await redis.hincrbyfloat(`${P}user:${p}`, 'availableBalance', Math.round(amt / 0.9))
-      }
-
-      // Admin history 24h
-      const today = getUgDate()
-      if (tx.type === 'deposit') {
-        await redis.lpush(`${P}admin:deposit_history:${today}`, updatedTxString)
-        await redis.expire(`${P}admin:deposit_history:${today}`, 86400)
-      } else if (tx.type === 'withdraw') {
-        await redis.lpush(`${P}admin:withdraw_history:${today}`, updatedTxString)
-        await redis.expire(`${P}admin:withdraw_history:${today}`, 86400)
-      }
-
-      await redis.lrem(`${P}pending_tx`, 0, id)
-      await redis.hdel(`${P}tx:lookup`, id)
-
-      const stillPending = (await redis.lrange(key, 0, 199) || []).map(parse).some(t => t?.status === 'pending')
-      if (!stillPending) await redis.srem(`${P}admin:pending_txs`, key)
-
-      return NextResponse.json({ success: true, transaction: updatedTx })
     }
 
     if (action === 'resetPassword') {
@@ -194,7 +205,6 @@ export async function POST(req) {
       const txStr = JSON.stringify(tx)
       await redis.lpush(`${P}tx:${ph}:${dateStr}`, txStr)
       await redis.lpush(`${P}tx:${ph}:history`, txStr)
-
       await redis.lpush(`${P}admin:deposit_history:${dateStr}`, txStr)
       await redis.expire(`${P}admin:deposit_history:${dateStr}`, 86400)
 
