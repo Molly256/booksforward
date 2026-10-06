@@ -45,7 +45,7 @@ export async function GET(req) {
         })
         if (deadKeys.length > 0) await redis.srem(`${P}admin:pending_txs`,...deadKeys)
       }
-      return NextResponse.json({ success: true, pending: list })
+      return NextResponse.json({ success: true, pending: list }, { headers: { 'Cache-Control': 'no-store' } })
     }
 
     if (a === 'user') {
@@ -59,7 +59,6 @@ export async function GET(req) {
       return NextResponse.json({ success: true, user: u })
     }
 
-    // Admin histories that disappear every 24hrs
     if (a === 'deposit_history') {
       const today = getUgDate()
       const items = await redis.lrange(`${P}admin:deposit_history:${today}`, 0, 99)
@@ -83,7 +82,6 @@ export async function POST(req) {
       let key = null
       let p = ph
 
-      // try lookup with bf: prefix
       const lookupKey = await redis.hget(`${P}tx:lookup`, id)
       if (lookupKey) key = lookupKey.startsWith(P)? lookupKey : `${P}${lookupKey}`
 
@@ -109,52 +107,58 @@ export async function POST(req) {
       if (!p) return NextResponse.json({ success: false, error: 'Could not resolve phone' }, { status: 400 })
       if (tx.status!== 'pending') return NextResponse.json({ success: false, error: 'Already processed' }, { status: 400 })
 
-      const updatedTx = {...tx, status, updatedAt: getUgDateTime(), createdAt: tx.createdAt || getUgDateTime() }
+      // FIXED: normalize status + keep full YYYY-MM-DD HH:mm:ss
+      const finalStatus = String(status).toLowerCase() === 'completed'? 'success' : String(status).toLowerCase()
+      const now = getUgDateTime()
+      const updatedTx = {
+       ...tx,
+        status: finalStatus,
+        updatedAt: now,
+        createdAt: String(tx.createdAt || now).slice(0,19),
+        timestamp: String(tx.createdAt || now).slice(0,19)
+      }
       const updatedTxString = JSON.stringify(updatedTx)
 
       // UPDATE DAILY KEY
       await redis.lrem(key, 1, originalItemString)
       await redis.lpush(key, updatedTxString)
 
-      // UPDATE HISTORY KEY bf:tx:phone:history - creates history in user tx button
+      // UPDATE HISTORY KEY - this is what user sees, MUST update
       const hKey = `${P}tx:${p}:history`
-      const hItems = await redis.lrange(hKey, 0, 399) || []
+      const hItems = await redis.lrange(hKey, 0, 500) || []
       const oldHistoryString = hItems.find(x => parse(x)?.id === id)
       if (oldHistoryString) {
         await redis.lrem(hKey, 1, oldHistoryString)
-        await redis.lpush(hKey, updatedTxString)
-      } else {
-        // if not in history yet, push it
-        await redis.lpush(hKey, updatedTxString)
       }
+      await redis.lpush(hKey, updatedTxString)
 
-      // Balance
+      // BALANCE LOGIC
       const amt = +String(tx.amount || 0).replace(/,/g, '')
-      if (status === 'success' && tx.type === 'deposit') {
+      if (finalStatus === 'success' && tx.type === 'deposit') {
         await redis.hincrbyfloat(`${P}user:${p}`, 'availableBalance', amt)
       }
-      if (status === 'failed' && tx.type === 'withdraw') {
+      if (finalStatus === 'failed' && tx.type === 'withdraw') {
+        // refund gross with fee
         await redis.hincrbyfloat(`${P}user:${p}`, 'availableBalance', Math.round(amt / 0.9))
       }
 
-      // Save to admin row history with 24hrs expire
+      // Admin history 24h
       const today = getUgDate()
       if (tx.type === 'deposit') {
         await redis.lpush(`${P}admin:deposit_history:${today}`, updatedTxString)
         await redis.expire(`${P}admin:deposit_history:${today}`, 86400)
-      } else {
+      } else if (tx.type === 'withdraw') {
         await redis.lpush(`${P}admin:withdraw_history:${today}`, updatedTxString)
         await redis.expire(`${P}admin:withdraw_history:${today}`, 86400)
       }
 
-      // Remove from pending
       await redis.lrem(`${P}pending_tx`, 0, id)
       await redis.hdel(`${P}tx:lookup`, id)
 
       const stillPending = (await redis.lrange(key, 0, 199) || []).map(parse).some(t => t?.status === 'pending')
       if (!stillPending) await redis.srem(`${P}admin:pending_txs`, key)
 
-      return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true, transaction: updatedTx })
     }
 
     if (action === 'resetPassword') {
@@ -164,7 +168,6 @@ export async function POST(req) {
       return NextResponse.json({ success: true })
     }
 
-    // NEW: ADMIN DEPOSIT TO USER - creates system increase
     if (action === 'adminDeposit') {
       if (!ph ||!amount) return NextResponse.json({ success: false, error: 'Missing phone/amount' }, { status: 400 })
       const userKey = `${P}user:${ph}`
@@ -183,15 +186,15 @@ export async function POST(req) {
         label: 'System Increase',
         amount: String(amt),
         status: 'success',
-        createdAt: timeStr, // YYYY-MM-DD HH:mm:ss Uganda
+        createdAt: timeStr,
+        timestamp: timeStr,
         phone: ph,
         note: 'Admin deposit'
       }
       const txStr = JSON.stringify(tx)
       await redis.lpush(`${P}tx:${ph}:${dateStr}`, txStr)
-      await redis.lpush(`${P}tx:${ph}:history`, txStr) // never delete - user sees in tx history button
+      await redis.lpush(`${P}tx:${ph}:history`, txStr)
 
-      // Also in admin deposit history row - auto clears 24hrs
       await redis.lpush(`${P}admin:deposit_history:${dateStr}`, txStr)
       await redis.expire(`${P}admin:deposit_history:${dateStr}`, 86400)
 
