@@ -48,7 +48,7 @@ export default function Dashboard() {
     { icon: '🧾', label: 'Transactions', href: '/transactions' },
     { icon: '💸', label: 'Withdraw', href: '/withdraw' },
     { icon: '💰', label: 'Deposit', href: '/deposit' },
-    { icon: '🎰', label: 'Magical Wheel', href: '/wheel' },
+    { icon: '🎰', label: 'Magical Wheel', href: '/magicalwheel' },
     { icon: '🎁', label: 'Invite', href: '/invite' },
     { icon: '📲', label: 'Download App', href: '/downloadapp' },
     { icon: '🤝', label: 'Team', href: '/myteam' },
