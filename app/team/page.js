@@ -157,7 +157,7 @@ export default function TeamPage() {
                     })}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-400 font-semibold py-6 text-center">No members yet in Team {selectedTeam}.</p>
+                  <p className="text-xs text-gray-400 font-semibold py-6 text-center">No members in Team {selectedTeam}.</p>
                 )}
               </div>
             )}
