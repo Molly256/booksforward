@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis';
-import fs from 'fs/promises';
-import path from 'path';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -9,27 +7,9 @@ export const dynamic = 'force-dynamic';
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
-  cache: 'no-store' 
 });
 
-let BOOKS_MAP = null;
-async function getBooksMap() {
-  if (BOOKS_MAP) return BOOKS_MAP;
-  const jsPath = path.join(process.cwd(), 'app', 'data.js');
-  const jsonPath = path.join(process.cwd(), 'app', 'data', 'books.json');
-  let ALL_BOOKS = [];
-  try {
-    const mod = await import(jsPath);
-    const data = mod.default || mod.books || mod.BOOKS || mod;
-    ALL_BOOKS = Array.isArray(data) ? data : data.books || [];
-  } catch {
-    const rawData = await fs.readFile(jsonPath, 'utf8');
-    const parsed = JSON.parse(rawData);
-    ALL_BOOKS = Array.isArray(parsed) ? parsed : (parsed.books || []);
-  }
-  BOOKS_MAP = new Map(ALL_BOOKS.map(b => [String(b.id || b._id), b]));
-  return BOOKS_MAP;
-}
+const P = 'bf:';
 
 function getUgandaDateString() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' });
@@ -42,48 +22,52 @@ export async function GET(request) {
     const date = searchParams.get('date') || getUgandaDateString();
     if (!phone) return NextResponse.json({ success: false, books: [] }, { status: 400 });
 
-    // bf: prefix - booksforward project
-    const bookIds = await redis.smembers(`bf:books:${phone}:${date}`);
+    const setKey = `${P}books:${phone}:${date}`;
+    const bookIds = await redis.smembers(setKey);
+
+    console.log(`[DATA API] ${setKey} ->`, bookIds);
+
     if (!bookIds?.length) {
-      return NextResponse.json(
-        { success: true, books: [] }, 
-        { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
-      );
+      return NextResponse.json({ success: true, books: [] }, {
+        headers: { 'Cache-Control': 'no-store' }
+      });
     }
 
-    const BOOKS_MAP = await getBooksMap();
-    
-    const pipeline = redis.pipeline();
-    bookIds.forEach(id => {
-      pipeline.hgetall(`bf:book:${phone}:${date}:${String(id).trim()}`);
-    });
-    const individualBookHashes = await pipeline.exec();
+    // Load BOOKS correctly - support bookId field
+    const mod = await import('@/app/data.js');
+    const ALL_BOOKS = mod.default || mod.BOOKS || mod.books || [];
+    const BOOKS_MAP = new Map(
+      ALL_BOOKS.map(b => [String(b.bookId || b.id || b._id), b])
+    );
 
-    const booksForToday = bookIds.map((id, index) => {
+    const pipeline = redis.pipeline();
+    bookIds.forEach(id => pipeline.hgetall(`${P}book:${phone}:${date}:${String(id).trim()}`));
+    const hashes = await pipeline.exec();
+
+    const booksForToday = bookIds.map((id, i) => {
       const cleanId = String(id).trim();
-      const b = BOOKS_MAP.get(cleanId);
-      const hashData = individualBookHashes[index] || {};
-      const currentStatus = hashData.status || 'pending';
+      const master = BOOKS_MAP.get(cleanId);
+      const h = hashes[i] || {};
 
       return {
         bookId: cleanId,
-        title: (b ? b.title : hashData.title) || `Book ${cleanId}`,
-        cover: `/books/covers/${cleanId}.jpg`,
-        reward: hashData.reward || String(b?.reward || '0'),
-        author: b ? b.author : 'Exclusive Author',
-        preview: b ? (b.preview || b.description || '') : '',
-        status: currentStatus, 
-        readAt: currentStatus === 'read' || currentStatus === 'submitted' ? date : null,
-        submittedAt: currentStatus === 'submitted' ? date : null,
+        title: h.title || master?.title || `Book ${cleanId}`,
+        // FIXED: use /covers/ to avoid /books route conflict
+        cover: `/covers/${cleanId}.jpg`,
+        reward: h.reward || '810',
+        author: master?.author || 'Exclusive Author',
+        preview: master?.preview || '',
+        status: h.status || 'pending',
+        readAt: null,
+        submittedAt: null,
       };
     });
 
-    return NextResponse.json(
-      { success: true, books: booksForToday }, 
-      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
-    );
-  } catch (error) {
-    console.error('API /books/data Error:', error);
-    return NextResponse.json({ success: false, books: [] }, { status: 500 });
+    return NextResponse.json({ success: true, books: booksForToday }, {
+      headers: { 'Cache-Control': 'no-store' }
+    });
+  } catch (e) {
+    console.error('API /books/data Error:', e);
+    return NextResponse.json({ success: false, books: [], error: e.message }, { status: 500 });
   }
 }
