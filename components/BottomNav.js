@@ -15,7 +15,7 @@ export default function BottomNav() {
   const navItems = [
     { href: '/dashboard', icon: '🏠', label: 'Home' },
     { href: '/viplevels', icon: '👑', label: 'VipLevels' },
-    { href: '/books', icon: '📚', label: 'Tasks' },
+    { href: '/task', icon: '📚', label: 'Tasks' },
     { href: '/my', icon: '👤', label: 'My' },
   ]
 
