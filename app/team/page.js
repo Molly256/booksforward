@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 export default function TeamPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [selectedTeam, setSelectedTeam] = useState(null) // null = overview, 'A'/'B'/'C' = own page
+  const [selectedTeam, setSelectedTeam] = useState(null)
 
   useEffect(function() {
     const userData = JSON.parse(localStorage.getItem('booksforward_user') || '{}')
@@ -16,34 +16,33 @@ export default function TeamPage() {
       return
     }
     fetch('/api/team?phone=' + userData.phone)
-  .then(function(r) { return r.json() })
-  .then(function(res) {
+.then(function(r) { return r.json() })
+.then(function(res) {
         if (res.success) setData(res)
         setLoading(false)
       })
-  .catch(function() { setLoading(false) })
+.catch(function() { setLoading(false) })
   }, [])
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-white text-gray-500 font-medium">Loading network tree...</div>
-  if (!data) return <div className="min-h-screen flex items-center justify-center">No data</div>
+  if (!data &&!loading) return <div className="min-h-screen flex items-center justify-center">No data</div>
 
-  const teamAList = data.listA || []
-  const teamBList = data.listB || []
-  const teamCList = data.listC || []
+  const teamAList = data?.listA || []
+  const teamBList = data?.listB || []
+  const teamCList = data?.listC || []
 
   let displayCommission = 0
-  if (data.transactions && Array.isArray(data.transactions)) {
+  if (data?.transactions && Array.isArray(data.transactions)) {
     displayCommission = data.transactions
-  .filter(function(tx){
+.filter(function(tx){
         const t = String(tx.type || tx.txType || '').toLowerCase()
         return t.startsWith('bf') && t.includes('commission')
       })
-  .reduce(function(s, tx){ return s + Number(tx.amount || 0) }, 0)
+.reduce(function(s, tx){ return s + Number(tx.amount || 0) }, 0)
     if (displayCommission === 0) {
       displayCommission = data.teamCommissionTotal!== undefined? Number(data.teamCommissionTotal) : Number(data.total || 0)
     }
   } else {
-    displayCommission = data.teamCommissionTotal!== undefined? Number(data.teamCommissionTotal) : Number(data.total || 0)
+    displayCommission = data?.teamCommissionTotal!== undefined? Number(data?.teamCommissionTotal) : Number(data?.total || 0)
   }
 
   const getActiveList = function(team) {
@@ -87,66 +86,82 @@ export default function TeamPage() {
       </div>
 
       <div className="max-w-2xl mx-auto p-4">
-        {/* Commission stays always */}
         <div className="rounded-2xl shadow-md p-6 mb-6" style={{background:'#00C853'}}>
           <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{color:'#000'}}>Commission from Team</p>
           <p className="text-3xl font-black" style={{color:'#000'}}>
-            {displayCommission.toLocaleString()} shs
+            {loading? '...' : displayCommission.toLocaleString() + ' shs'}
           </p>
         </div>
 
-        {/* IF NO TEAM SELECTED - SHOW 3 CARDS ONLY (No 5th button) */}
-        {!selectedTeam && (
-          <>
-            <div className="grid grid-cols-3 gap-3 mb-6">
-              <button type="button" onClick={function() { setSelectedTeam('A') }} className="rounded-xl border p-4 text-center outline-none cursor-pointer bg-white border-gray-100 hover:border-[#00C853] transition-all">
-                <p className="text-xs font-bold uppercase text-gray-400">TEAM A</p>
-                <p className="text-xl font-black my-1 text-[#00C853]">{teamAList.length}</p>
-                <p className="text-[10px] font-bold text-gray-600">Members</p>
-                <p className="text-[9px] font-bold text-[#00C853] mt-2">View →</p>
-              </button>
-              <button type="button" onClick={function() { setSelectedTeam('B') }} className="rounded-xl border p-4 text-center outline-none cursor-pointer bg-white border-gray-100 hover:border-[#00C853] transition-all">
-                <p className="text-xs font-bold uppercase text-gray-400">TEAM B</p>
-                <p className="text-xl font-black my-1 text-[#00C853]">{teamBList.length}</p>
-                <p className="text-[10px] font-bold text-gray-600">Members</p>
-                <p className="text-[9px] font-bold text-[#00C853] mt-2">View →</p>
-              </button>
-              <button type="button" onClick={function() { setSelectedTeam('C') }} className="rounded-xl border p-4 text-center outline-none cursor-pointer bg-white border-gray-100 hover:border-[#00C853] transition-all">
-                <p className="text-xs font-bold uppercase text-gray-400">TEAM C</p>
-                <p className="text-xl font-black my-1 text-[#00C853]">{teamCList.length}</p>
-                <p className="text-[10px] font-bold text-gray-600">Members</p>
-                <p className="text-[9px] font-bold text-[#00C853] mt-2">View →</p>
-              </button>
-            </div>
-            <p className="text-[11px] text-gray-400 text-center font-semibold">Tap any team card to open its own page</p>
-          </>
-        )}
-
-        {/* IF TEAM SELECTED - SHOW ITS OWN PAGE */}
-        {selectedTeam && (
-          <div className="bg-white rounded-xl border border-gray-100 p-5">
-            <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide pb-3 border-b border-gray-100 mb-3">
-              Team {selectedTeam} Members ({getActiveList(selectedTeam).length})
-            </h3>
-            {getActiveList(selectedTeam).length > 0? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {getActiveList(selectedTeam).map(function(member) {
-                  const isObject = member && typeof member === 'object'
-                  const phoneNum = isObject? member.phone : member
-                  const rawVip = isObject? (member.vip || member.vipLevel || member.level || '') : ''
-                  const vipLabel = formatVip(rawVip)
-                  return (
-                    <div key={phoneNum} className="bg-gray-50 border border-gray-100 text-gray-700 text-xs font-bold py-2.5 px-3 rounded-lg text-center flex items-center justify-center gap-2">
-                      <span>{phoneNum}</span>
-                      <span className="text-[10px] font-black lowercase">{vipLabel}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="text-xs text-gray-400 font-semibold py-6 text-center">No members yet in Team {selectedTeam}.</p>
-            )}
+        {loading? (
+          <div className="flex justify-center py-10">
+            <div className="w-6 h-6 border-2 border-[#00C853] border-t-transparent rounded-full animate-spin"></div>
           </div>
+        ) : (
+          <>
+            {!selectedTeam && (
+              <div className="flex flex-col gap-3 mb-6">
+                <button type="button" onClick={function() { setSelectedTeam('A') }} className="rounded-xl border p-4 flex justify-between items-center outline-none cursor-pointer bg-white border-gray-100">
+                  <div className="text-left">
+                    <p className="text-xs font-bold uppercase text-gray-400">TEAM A</p>
+                    <p className="text-[10px] font-bold text-gray-600">{teamAList.length} Members</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xl font-black text-[#00C853]">{teamAList.length}</p>
+                    <span className="text-gray-300">›</span>
+                  </div>
+                </button>
+
+                <button type="button" onClick={function() { setSelectedTeam('B') }} className="rounded-xl border p-4 flex justify-between items-center outline-none cursor-pointer bg-white border-gray-100">
+                  <div className="text-left">
+                    <p className="text-xs font-bold uppercase text-gray-400">TEAM B</p>
+                    <p className="text-[10px] font-bold text-gray-600">{teamBList.length} Members</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xl font-black text-[#00C853]">{teamBList.length}</p>
+                    <span className="text-gray-300">›</span>
+                  </div>
+                </button>
+
+                <button type="button" onClick={function() { setSelectedTeam('C') }} className="rounded-xl border p-4 flex justify-between items-center outline-none cursor-pointer bg-white border-gray-100">
+                  <div className="text-left">
+                    <p className="text-xs font-bold uppercase text-gray-400">TEAM C</p>
+                    <p className="text-[10px] font-bold text-gray-600">{teamCList.length} Members</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xl font-black text-[#00C853]">{teamCList.length}</p>
+                    <span className="text-gray-300">›</span>
+                  </div>
+                </button>
+              </div>
+            )}
+
+            {selectedTeam && (
+              <div className="bg-white rounded-xl border border-gray-100 p-5">
+                <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide pb-3 border-b border-gray-100 mb-3">
+                  Team {selectedTeam} Members ({getActiveList(selectedTeam).length})
+                </h3>
+                {getActiveList(selectedTeam).length > 0? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {getActiveList(selectedTeam).map(function(member) {
+                      const isObject = member && typeof member === 'object'
+                      const phoneNum = isObject? member.phone : member
+                      const rawVip = isObject? (member.vip || member.vipLevel || member.level || '') : ''
+                      const vipLabel = formatVip(rawVip)
+                      return (
+                        <div key={phoneNum} className="bg-gray-50 border border-gray-100 text-gray-700 text-xs font-bold py-2.5 px-3 rounded-lg text-center flex items-center justify-center gap-2">
+                          <span>{phoneNum}</span>
+                          <span className="text-[10px] font-black lowercase">{vipLabel}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 font-semibold py-6 text-center">No members yet in Team {selectedTeam}.</p>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>
