@@ -17,8 +17,27 @@ function getUgandaDateString() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' });
 }
 
+// NEW: Uganda DateTime YYYY-MM-DD-HH-mm-ss
+function getUgandaDateTime() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Kampala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const m = {};
+  parts.forEach(p => m[p.type] = p.value);
+  return `${m.year}-${m.month}-${m.day}-${m.hour}-${m.minute}-${m.second}`;
+}
+
 function makeId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+  // Unique but readable: 2026-05-13-16-30-45-abc12
+  return `${getUgandaDateTime()}-${Math.random().toString(36).slice(2,7)}`;
 }
 
 function safeParse(str, fallback = []) {
@@ -40,7 +59,6 @@ export async function POST(request) {
     }
 
     const today = getUgandaDateString();
-    // bf: prefix - booksforward project isolation
     const bookKey = `bf:book:${phone}:${today}:${bookId}`;
     const userKey = `bf:user:${phone}`;
     const txKey = `bf:tx:${phone}:${today}`;
@@ -86,15 +104,20 @@ export async function POST(request) {
         currentCompleted.push(String(bookId));
       }
 
+      // FIXED: Now uses Uganda DateTime, not long number
+      const ugDateTime = getUgandaDateTime();
+      
       const tx = {
-        id: makeId(),
-        type: 'book_income', 
+        id: makeId(), // unique: 2026-05-13-16-30-45-abc12
+        type: 'daily income', // shows DAILY INCOME directly
+        label: 'Daily Income',
         amount: String(payout),
-        status: 'completed',
-        createdAt: String(Date.now()), 
+        status: 'Success', // shows Success like screenshot
+        createdAt: ugDateTime, // 2026-05-13-16-30-45 - Uganda time!
         phone: phone,
         vipLevel: String(vipLevel),
-        bookTitle: `Book ${bookId}` 
+        bookTitle: `Book ${bookId}`,
+        bookId: String(bookId)
       };
 
       const updatedBalance = Number(userData.availableBalance || 0) + payout;
@@ -110,9 +133,13 @@ export async function POST(request) {
       });
 
       const txString = JSON.stringify(tx);
+      // KEEP ALL HISTORY - never expires
       await redis.lpush(txKey, txString); 
-      await redis.lpush(historyKey, txString); 
+      await redis.lpush(historyKey, txString); // permanent history
       await redis.lpush(incomeKey, txString); 
+
+      // Ensure history key never expires (safety)
+      await redis.persist(historyKey);
 
       return NextResponse.json({
         success: true,

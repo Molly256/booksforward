@@ -17,6 +17,36 @@ const TYPE_MAP = {
 }
 const toTabKey = (t) => TYPE_MAP[String(t||'').toLowerCase().trim()] || String(t||'').toLowerCase().replace(/_/g,' ').trim()
 
+// NEW: Uganda Time YYYY-MM-DD-HH-mm-ss
+function formatUgDate(input) {
+  if (!input) return ''
+  let d
+  // If it's old numeric timestamp like 1791467234887
+  if (/^\d{10,13}$/.test(String(input).trim())) {
+    d = new Date(Number(input))
+  } else {
+    d = new Date(input)
+  }
+  if (isNaN(d.getTime())) return String(input).slice(0,19)
+
+  // Force Uganda timezone Africa/Kampala
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Kampala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+  const parts = fmt.formatToParts(d)
+  const map = {}
+  for (const p of parts) map[p.type] = p.value
+  // YYYY-MM-DD-HH-mm-ss
+  return `${map.year}-${map.month}-${map.day}-${map.hour}-${map.minute}-${map.second}`
+}
+
 export default function Transactions() {
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -46,8 +76,6 @@ export default function Transactions() {
     return allTxs.filter(tx => toTabKey(tx.type) === activeTab.toLowerCase())
   }, [allTxs, activeTab])
 
-  const formatUgDate = (c) => String(c||'').slice(0,19)
-
   if (!user) return <div className="p-4">Loading...</div>
 
   return (
@@ -72,13 +100,12 @@ export default function Transactions() {
             filteredTxs.map(tx=>{
               const isPending = String(tx.status).toLowerCase() === 'pending'
               const absAmt = Math.abs(Number(tx.amount)||0).toLocaleString()
-
               return (
                 <div key={tx.id} className="border border-gray-200 rounded-lg p-4 bg-white">
                   <div className="flex justify-between">
                     <div className="w-full">
                       <p className="text-sm font-bold uppercase text-black">{String(tx.type).toUpperCase()}</p>
-                      <p className="text-xs text-gray-500">{tx.label}</p>
+                      <p className="text-xs text-gray-500">{tx.label || 'Daily Income'}</p>
                       {String(tx.type).toLowerCase()==='withdraw' && (
                         <div className="mt-2 text-[11px] text-gray-700 border-t border-dashed pt-2">
                           <p>Mobile: {tx.withdrawPhone || tx.phone}</p>
@@ -87,11 +114,9 @@ export default function Transactions() {
                       )}
                       <div className="mt-2 flex justify-between bg-gray-50 p-2 rounded">
                         <span className="text-[11px] font-mono font-bold text-gray-500">{formatUgDate(tx.createdAt)} UGA</span>
-                        {/* NO + or - sign */}
                         <span className={`text-sm ${isPending? 'text-red-500 font-light' : 'text-black font-medium'}`}>{absAmt} shs</span>
                       </div>
                     </div>
-                    {/* pending red light, success green medium */}
                     <span className={`text-xs ml-3 capitalize ${isPending? 'text-red-500 font-light' : 'text-green-600 font-medium'}`}>{tx.status}</span>
                   </div>
                 </div>

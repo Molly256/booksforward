@@ -206,7 +206,6 @@ export default function TaskPage() {
         </div>
       ) : (
         <>
-          <p style={{ fontSize: 12, color: '#666', marginBottom: 12, fontWeight: 700 }}>Total: {books.length} books (same as IDs in redis)</p>
           <div style={{ display: 'grid', gap: '20px' }}>
             {pendingBooks.map(function(book) {
               const isRead = completedReadLS.includes(String(book.bookId)) || book.status === 'read'
