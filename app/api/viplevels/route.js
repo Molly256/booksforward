@@ -5,120 +5,145 @@ import { Redis } from '@upstash/redis';
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { VIPS } from '@/app/config/vips';
 
 const redis = Redis.fromEnv();
-let CACHED_VALID_BOOKS = null;
+const P = 'bf:'; // 2 projects in one DB
 
+export const VIPS = {
+  0: { books: 5, perBook: 400, price: 0, days: 1 },
+  1: { books: 5, perBook: 400, price: 50000, days: 365 },
+  2: { books: 10, perBook: 810, price: 230000, days: 365 },
+  3: { books: 15, perBook: 1466, price: 650000, days: 365 },
+  4: { books: 20, perBook: 1500, price: 850000, days: 365 },
+};
+
+let CACHED_VALID_BOOKS = null;
 function getValidBooksCached() {
   if (CACHED_VALID_BOOKS) return CACHED_VALID_BOOKS;
   try {
     const booksPath = path.join(process.cwd(), 'app/data/books.json');
+    const jsPath = path.join(process.cwd(), 'app/data.js');
+    let allBooks = [];
+    try {
+      allBooks = JSON.parse(fs.readFileSync(booksPath, 'utf8'));
+    } catch {
+      // fallback to app/data.js if json not found
+      try {
+        const mod = require(jsPath);
+        allBooks = mod.default || mod.books || mod;
+      } catch {}
+    }
     const coversPath = path.join(process.cwd(), 'public/books/covers');
-    const allBooks = JSON.parse(fs.readFileSync(booksPath, 'utf8'));
     const coverIds = new Set(fs.readdirSync(coversPath).map(f => f.replace(/\.jpg$/i, '')));
-    CACHED_VALID_BOOKS = allBooks.filter(b => coverIds.has(String(b.id)));
+    CACHED_VALID_BOOKS = allBooks.filter(b => coverIds.has(String(b.id || b._id)));
     return CACHED_VALID_BOOKS;
-  } catch (err) {
+  } catch {
     return [];
   }
 }
 
 function pickRandomBooks(count) {
   const pool = getValidBooksCached();
-  if (pool.length === 0) return [];
-  const result = [], chosenIndices = new Set(), actualCount = Math.min(count, pool.length);
-  while (chosenIndices.size < actualCount) {
-    const randIdx = Math.floor(Math.random() * pool.length);
-    if (!chosenIndices.has(randIdx)) {
-      chosenIndices.add(randIdx);
-      result.push(pool[randIdx]);
-    }
+  if (!pool.length) return [];
+  const result = [], chosen = new Set(), n = Math.min(count, pool.length);
+  while (chosen.size < n) {
+    const i = Math.floor(Math.random() * pool.length);
+    if (!chosen.has(i)) { chosen.add(i); result.push(pool[i]); }
   }
   return result;
 }
 
-const safeParse = (s, f = []) => (!s? f : typeof s === 'object'? s : JSON.parse(s));
 const getUgandaDateString = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' });
 const getUgandaDateTimeString = () => new Date().toLocaleString("en-CA", { timeZone: "Africa/Kampala", hour12: false }).slice(0, 16).replace(',', ' ');
 
 function assignBooksToUser(phone, vipLevel, today, pipeline) {
   const selectedVip = VIPS[vipLevel];
-  const booksCount = selectedVip.books; // DYNAMIC - not 4
-  const validBooks = pickRandomBooks(booksCount);
-  if (validBooks.length === 0) throw new Error('No books found');
+  const validBooks = pickRandomBooks(selectedVip.books);
+  if (!validBooks.length) throw new Error('No books found');
 
   validBooks.forEach(b => {
-    pipeline.hset('book:' + phone + ':' + today + ':' + b.id, {
-      phone, bookId: String(b.id), vipLevel: String(vipLevel), reward: selectedVip.perBook,
-      title: b.title, cover: '/books/covers/' + b.id + '.jpg', status: 'pending', date: today, createdAt: String(Date.now())
+    const id = String(b.id || b._id);
+    pipeline.hset(P + 'book:' + phone + ':' + today + ':' + id, {
+      phone, bookId: id, vipLevel: String(vipLevel), reward: String(selectedVip.perBook),
+      title: b.title, cover: '/books/covers/' + id + '.jpg', status: 'pending', date: today, createdAt: String(Date.now())
     });
-    pipeline.sadd('books:' + phone + ':' + today, String(b.id));
+    pipeline.sadd(P + 'books:' + phone + ':' + today, id);
   });
 
   return {
-    unlockedBooks: validBooks.map(b => String(b.id)),
-    assignedBooksMeta: validBooks.map(b => ({ id: String(b.id), title: b.title, cover: '/books/covers/' + b.id + '.jpg', reward: selectedVip.perBook }))
+    unlockedBooks: validBooks.map(b => String(b.id || b._id)),
+    assignedBooksMeta: validBooks.map(b => ({ id: String(b.id || b._id), title: b.title, cover: '/books/covers/' + (b.id || b._id) + '.jpg', reward: selectedVip.perBook }))
   };
 }
 
 export async function GET() {
-  return NextResponse.json({ success: true, levels: Object.keys(VIPS).map(k => Object.assign({ level: Number(k) }, VIPS[k])) });
+  return NextResponse.json({ success: true, levels: Object.keys(VIPS).map(k => ({ level: Number(k),...VIPS[k] })) });
 }
 
 export async function POST(req) {
   try {
     const body = await req.json(), phone = body.phone, action = body.action, payload = body.payload;
-    // ACCEPT BOTH UPGRADE and BUY_VIP for compatibility
     if (!phone || (action!== 'UPGRADE' && action!== 'BUY_VIP')) return NextResponse.json({ success: false, message: 'Missing data' }, { status: 400 });
 
     const vipLevel = payload?.vipLevel;
     if (vipLevel === undefined ||!VIPS[vipLevel] || vipLevel > 4) return NextResponse.json({ success: false, message: 'Invalid level' }, { status: 400 });
 
-    const userKey = 'user:' + phone, user = await redis.hgetall(userKey);
+    const userKey = P + 'user:' + phone, user = await redis.hgetall(userKey);
     if (!user ||!user.phone) return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
 
     const currentVip = Number(user.vip || 0);
-    if (vipLevel <= currentVip && vipLevel!== 0) return NextResponse.json({ success: false, message: 'Already owned' }, { status: 400 });
+    const dateStr = getUgandaDateString(), timeStr = getUgandaDateTimeString(), historyKey = P + 'tx:' + phone + ':history', pipeline = redis.pipeline();
+    const ugDay = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" })).getDay();
+    const isSunday = ugDay === 0;
 
-    const upgradeCost = VIPS[vipLevel].price;
-    const currentBalance = Number(user.availableBalance || 0);
-
-    if (vipLevel!== 0 && currentBalance < upgradeCost) {
-      return NextResponse.json({ success: false, message: 'Insufficient Balance' }, { status: 400 });
+    // VIP0: one-time only, Mon-Sun, hasBoughtVip stays false
+    if (vipLevel === 0) {
+      if (user.vipActivated === 'true' || user.vipActivated === true) {
+        return NextResponse.json({ success: false, message: 'Vip0 already activated' }, { status: 400 });
+      }
+      const assignResult = assignBooksToUser(phone, 0, dateStr, pipeline);
+      pipeline.hset(userKey, {
+        vip: '0',
+        vipActivated: 'true',
+        hasBoughtVip: 'false',
+        vipExpiry: new Date(Date.now() + 1*24*60*60*1000).toISOString(),
+        unlockedBooks: JSON.stringify(assignResult.unlockedBooks),
+        completedBooks: '[]',
+        books_read_today: '0',
+        dailyIncome: '0',
+        lastResetDate: dateStr,
+        vip_bought_date: dateStr
+      });
+      pipeline.hincrby(userKey, 'spins', 1);
+      await pipeline.exec();
+      const updatedUser = await redis.hgetall(userKey);
+      return NextResponse.json({ success: true, user: updatedUser, books: assignResult.assignedBooksMeta });
     }
 
+    // VIP1-4
+    if (vipLevel <= currentVip && (user.hasBoughtVip === 'true' || user.hasBoughtVip === true)) {
+      return NextResponse.json({ success: false, message: 'Already owned' }, { status: 400 });
+    }
+    const upgradeCost = VIPS[vipLevel].price;
+    if (Number(user.availableBalance || 0) < upgradeCost) {
+      return NextResponse.json({ success: false, message: 'Insufficient Balance' }, { status: 400 });
+    }
     const isFirst = user.hasBoughtVip!== 'true' && user.hasBoughtVip!== true;
-    const dateStr = getUgandaDateString(), timeStr = getUgandaDateTimeString(), historyKey = 'tx:' + phone + ':history', pipeline = redis.pipeline();
-
-    const ugDay = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" })).getDay();
-    const isUgandaWeekend = ugDay === 0 || ugDay === 6;
-    const shouldAssignBooks = payload?.assignBooks!== false &&!isUgandaWeekend;
-
     let unlockedBooks = [], assignedBooksMeta = [];
-
-    if (shouldAssignBooks) {
+    if (!isSunday) {
       const assignResult = assignBooksToUser(phone, vipLevel, dateStr, pipeline);
       unlockedBooks = assignResult.unlockedBooks;
       assignedBooksMeta = assignResult.assignedBooksMeta;
-    } else {
-      unlockedBooks = safeParse(user.unlockedBooks);
     }
-
-    let newBalance = vipLevel === 0? currentBalance : currentBalance - upgradeCost;
-
-    // TRANSACTION HISTORY - UPGRADE
     pipeline.lpush(historyKey, JSON.stringify({ id: 'up_' + Date.now(), type: 'upgrade_vip', amount: String(-upgradeCost), note: 'Vip' + vipLevel + ' Upgrade', status: 'success', createdAt: timeStr }));
-
     pipeline.hincrby(userKey, 'spins', 1);
-
-    const expiryDays = VIPS[vipLevel].days || (vipLevel === 0? 1 : 365);
     pipeline.hset(userKey, {
       vip: String(vipLevel),
       vipPricePaid: String(upgradeCost),
-      availableBalance: String(newBalance),
+      availableBalance: String(Number(user.availableBalance || 0) - upgradeCost),
       hasBoughtVip: 'true',
-      vipExpiry: new Date(Date.now() + (expiryDays * 24 * 60 * 60 * 1000)).toISOString(),
+      vipActivated: 'true',
+      vipExpiry: new Date(Date.now() + (VIPS[vipLevel].days*24*60*60*1000)).toISOString(),
       unlockedBooks: JSON.stringify(unlockedBooks),
       completedBooks: '[]',
       books_read_today: '0',
@@ -126,12 +151,12 @@ export async function POST(req) {
       lastResetDate: dateStr,
       vip_bought_date: dateStr
     });
-
     await pipeline.exec();
     if (isFirst) await processHierarchicalCommissions(phone, vipLevel);
-
-    return NextResponse.json({ success: true, user: Object.assign({}, user, { vip: vipLevel, availableBalance: newBalance, unlockedBooks }), books: assignedBooksMeta });
+    const updated = await redis.hgetall(userKey);
+    return NextResponse.json({ success: true, user: updated, books: assignedBooksMeta, isSunday });
   } catch (err) {
+    console.error(err);
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
@@ -139,47 +164,33 @@ export async function POST(req) {
 async function processHierarchicalCommissions(buyerPhone, buyerVipLevel) {
   try {
     const vipAmts = { 0: 0, 1: 50000, 2: 230000, 3: 650000, 4: 850000 };
-    const timeStr = getUgandaDateTimeString();
+    const timeStr = new Date().toLocaleString("en-CA", { timeZone: "Africa/Kampala", hour12: false }).slice(0, 16).replace(',', ' ');
     const rates = [0.10, 0.02, 0.01], labels = ['A', 'B', 'C'], typeFlags = ['team_a_payout', 'team_b_payout', 'team_c_payout'];
-
-    const parent = await redis.hget('user:' + buyerPhone, 'invited_by');
+    const parent = await redis.hget(P + 'user:' + buyerPhone, 'invited_by');
     if (!parent ||!/^07\d{8}$/.test(String(parent).trim())) return;
     const cleanParent = String(parent).trim();
-
-    const grandparent = await redis.hget('user:' + cleanParent, 'invited_by');
+    const grandparent = await redis.hget(P + 'user:' + cleanParent, 'invited_by');
     const cleanGrandparent = grandparent && /^07\d{8}$/.test(String(grandparent).trim())? String(grandparent).trim() : null;
-
     let greatGrandparent = null;
     if (cleanGrandparent) {
-      const ggrand = await redis.hget('user:' + cleanGrandparent, 'invited_by');
+      const ggrand = await redis.hget(P + 'user:' + cleanGrandparent, 'invited_by');
       greatGrandparent = ggrand && /^07\d{8}$/.test(String(ggrand).trim())? String(ggrand).trim() : null;
     }
-
     const chain = [cleanParent, cleanGrandparent, greatGrandparent];
-    const uplineData = await Promise.all(chain.map(p => p? redis.hmget('user:' + p, 'vip', 'hasBoughtVip') : Promise.resolve(null)));
-    const commissionPipeline = redis.pipeline();
-    let hasQueuedOps = false;
-
+    const uplineData = await Promise.all(chain.map(p => p? redis.hmget(P + 'user:' + p, 'vip', 'hasBoughtVip') : Promise.resolve(null)));
+    const cp = redis.pipeline(); let hasOps = false;
     for (let i = 0; i < 3; i++) {
-      const uplinePhone = chain[i];
-      if (!uplinePhone) continue;
-      const userData = uplineData[i] || {}, uplineVip = Number(userData.vip || 0), hasBoughtVipStatus = userData.hasBoughtVip;
-      if (hasBoughtVipStatus!== 'true' && hasBoughtVipStatus!== true) continue;
-      if (uplineVip >= 0) {
-        const reward = Math.floor((vipAmts[Math.min(uplineVip, buyerVipLevel)] || 0) * rates[i]);
-        if (reward > 0) {
-          hasQueuedOps = true;
-          commissionPipeline.lpush('tx:' + uplinePhone + ':history', JSON.stringify({
-            id: 'tx_' + Date.now() + '_' + labels[i] + '_' + Math.random().toString(36).slice(2, 5),
-            type: typeFlags[i], label: 'commission', amount: String(reward), note: 'Invitation Rewards (Team ' + labels[i] + ': ' + buyerPhone + ')', status: 'success', createdAt: timeStr
-          }));
-          commissionPipeline.hincrby('user:' + uplinePhone, 'availableBalance', reward);
-          if (i === 0) {
-            commissionPipeline.hincrby('user:' + uplinePhone, 'spins', 1);
-          }
-        }
+      const up = chain[i]; if (!up) continue;
+      const ud = uplineData[i] || {};
+      if (ud.hasBoughtVip!== 'true' && ud.hasBoughtVip!== true) continue;
+      const reward = Math.floor((vipAmts[Math.min(Number(ud.vip||0), buyerVipLevel)] || 0) * rates[i]);
+      if (reward > 0) {
+        hasOps = true;
+        cp.lpush(P + 'tx:' + up + ':history', JSON.stringify({ id: 'tx_' + Date.now() + '_' + labels[i] + '_' + Math.random().toString(36).slice(2,5), type: typeFlags[i], label: 'commission', amount: String(reward), note: 'Invitation Rewards (Team ' + labels[i] + ': ' + buyerPhone + ')', status: 'success', createdAt: timeStr }));
+        cp.hincrby(P + 'user:' + up, 'availableBalance', reward);
+        if (i === 0) cp.hincrby(P + 'user:' + up, 'spins', 1);
       }
     }
-    if (hasQueuedOps) await commissionPipeline.exec();
-  } catch (err) {}
+    if (hasOps) await cp.exec();
+  } catch {}
 }

@@ -44,7 +44,6 @@ export default function Dashboard() {
   useEffect(() => { loadUser() }, [])
 
   const menuItems = [
-    { icon: '👑', label: 'VIP Levels', href: '/viplevels' },
     { icon: '🧾', label: 'Transactions', href: '/transactions' },
     { icon: '💸', label: 'Withdraw', href: '/withdraw' },
     { icon: '💰', label: 'Deposit', href: '/deposit' },
@@ -90,23 +89,23 @@ export default function Dashboard() {
         />
       </div>
 
-      <main style={{ background: '#FFFFFF', padding: '0 20px 110px', maxWidth:'480px', margin:'0 auto' }}>
+      <main style={{ background: '#FFFFFF', padding: '0 16px 110px', maxWidth:'480px', margin:'0 auto' }}>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '18px 15px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
           {menuItems.map(item => (
             <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{
-                  width: '100%', height: '95px',
+                  width: '100%', height: '125px',
                   background: HOT_GREEN,
-                  borderRadius: '14px',
+                  borderRadius: '18px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '30px', color: '#fff',
-                  boxShadow: '0 4px 12px rgba(0,200,83,0.35)'
+                  fontSize: '42px', color: '#fff',
+                  boxShadow: '0 6px 14px rgba(0,200,83,0.35)'
                 }}>
                   {item.icon}
                 </div>
-                <p style={{ margin: '7px 0 0', fontSize: '12px', fontWeight: '800', color: '#111' }}>
+                <p style={{ margin: '8px 0 0', fontSize: '13px', fontWeight: '800', color: '#111' }}>
                   {item.label}
                 </p>
               </div>
@@ -116,11 +115,11 @@ export default function Dashboard() {
 
         {isAdmin && (
           <div onClick={() => router.push('/admin')} style={{
-            marginTop:'22px', width:'100%', height:'85px', background:'#111', borderRadius:'14px',
+            marginTop:'18px', width:'100%', height:'95px', background:'#111', borderRadius:'18px',
             display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-            fontSize:'26px', color:'#fff', cursor:'pointer', border:`2px solid ${HOT_GREEN}`
+            fontSize:'32px', color:'#fff', cursor:'pointer', border:`2px solid ${HOT_GREEN}`
           }}>
-            🔐 <span style={{fontSize:'12px', fontWeight:'900', marginTop:'4px'}}>Admin Panel</span>
+            🔐 <span style={{fontSize:'13px', fontWeight:'900', marginTop:'4px'}}>Admin Panel</span>
           </div>
         )}
 
@@ -129,7 +128,7 @@ export default function Dashboard() {
       <Link href="/manager" style={{ textDecoration:'none' }}>
         <div style={{
           position: 'fixed',
-          bottom: '22px',
+          bottom: '88px',
           right: '18px',
           width: '58px',
           height: '58px',

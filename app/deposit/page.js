@@ -13,8 +13,8 @@ export default function Deposit() {
   const [toast, setToast] = useState(null)
 
   const paymentDetails = {
-    MTN: { number: '0769306151', name: 'BETTY ANYAIT' },
-    AIRTEL: { number: '0769306151', name: 'BETTY ANYAIT' }
+    MTN: { number: '0773207301', name: 'NABIWAFU JUDITH' },
+    AIRTEL: { number: '0704113706', name: 'MABONGA SUZAN' }
   }
 
   const showToast = (message, type = 'error') => {

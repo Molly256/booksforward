@@ -7,7 +7,7 @@ export const VIPS = {
   1: { name: 'Vip1', price: 50000, books: 5, perBook: 400, daily: 2000, days: 365 },
   2: { name: 'Vip2', price: 230000, books: 10, perBook: 810, daily: 8100, days: 365 },
   3: { name: 'Vip3', price: 650000, books: 15, perBook: 1466, daily: 22000, days: 365 },
-  4: { name: 'Vip4', price: 850000, books: 20, perBook: 1150, daily: 23000, days: 365 },
+  4: { name: 'Vip4', price: 850000, books: 20, perBook: 1500, daily: 30000, days: 365 },
 }
 
 const getTodayDateStrFullYear = () => {
@@ -20,13 +20,6 @@ const getTodayDateStrFullYear = () => {
 
 const getTodayTimeStrKampala = () => {
   return new Date().toLocaleString("en-CA", { timeZone: "Africa/Kampala", hour12: false }).slice(0,16).replace(',', ' ');
-}
-
-const isWeekendUganda = () => {
-  const ugandaTimeString = new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" })
-  const ugandaDate = new Date(ugandaTimeString)
-  const day = ugandaDate.getDay()
-  return day === 0 || day === 6
 }
 
 const Toast = ({ msg, onClose }) => {
@@ -95,6 +88,8 @@ export default function VipLevels() {
     userData.books_read_today = Number(userData.books_read_today || 0)
     userData.unlockedBooks = userData.unlockedBooks || []
     userData.completedBooks = userData.completedBooks || []
+    userData.hasBoughtVip = userData.hasBoughtVip || false
+    userData.vipActivated = userData.vipActivated || false
     localStorage.setItem('booksforward_user', JSON.stringify(userData))
     setUser(userData)
   }, [])
@@ -103,19 +98,31 @@ export default function VipLevels() {
 
   const handleBuyVip = async (vip) => {
     if (!user) return
-    if (vip.level <= Number(user.vip)) {
-      showToast('You already have this VIP or higher')
-      return
+
+    if (vip.level === 0) {
+      if (user.vipActivated) {
+        showToast('Vip0 already activated')
+        return
+      }
+      if (user.hasBoughtVip) {
+        showToast("Can't downgrade to Vip0")
+        return
+      }
+    } else {
+      if (vip.level <= Number(user.vip) && user.hasBoughtVip) {
+        showToast('You already have this VIP or higher')
+        return
+      }
+      if ((user.availableBalance || 0) < vip.price) {
+        showToast('Insufficient Available Balance')
+        return
+      }
     }
-    if ((user.availableBalance || 0) < vip.price) {
-      showToast('Insufficient Available Balance')
-      return
-    }
+
     setLoading(true)
     try {
       const dateStr = getTodayDateStrFullYear();
       const timeStr = getTodayTimeStrKampala();
-      const isWeekend = isWeekendUganda();
       const vipData = VIPS[vip.level];
       const res = await fetch('/api/viplevels', {
         method: 'POST',
@@ -131,8 +138,7 @@ export default function VipLevels() {
             daily: vipData.daily,
             perBook: vipData.perBook,
             dateStr,
-            timeStr,
-            assignBooks: !isWeekend
+            timeStr
           }
         })
       })
@@ -145,7 +151,7 @@ export default function VipLevels() {
       const updatedUser = { ...data.user }
       localStorage.setItem('booksforward_user', JSON.stringify(updatedUser))
       setUser(updatedUser)
-      showToast(isWeekend ? 'VIP Buy Successful - Books unlock on Monday' : 'VIP Buy Successful') 
+      showToast('Upgraded Successful')
     } catch (err) {
       showToast('Error: ' + err.message)
     } finally {
@@ -212,8 +218,18 @@ export default function VipLevels() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '420px', margin: '0 auto' }}>
           {vips.map(vip => {
-            const isCurrent = currentVipLevel === vip.level
-            const canBuy = vip.level > currentVipLevel
+            const isCurrent = currentVipLevel === vip.level && (vip.level===0 ? user.vipActivated : true)
+            let canBuy = false
+            if(vip.level===0){
+              canBuy = !user.vipActivated && !user.hasBoughtVip
+            } else {
+              if(!user.hasBoughtVip){
+                canBuy = true
+              } else {
+                canBuy = vip.level > currentVipLevel
+              }
+            }
+
             return (
               <div key={vip.level} style={{
                 background: '#fff',
@@ -252,7 +268,7 @@ export default function VipLevels() {
                   ) : isCurrent ? (
                     <div style={{ width: '100%', background: '#f2f2f2', borderRadius: '10px', padding: '11px 0', fontWeight: '900', fontSize: '14px', textAlign: 'center' }}>✅ CURRENT</div>
                   ) : (
-                    <div style={{ width: '100%', background: '#f2f2f2', borderRadius: '10px', padding: '11px 0', fontWeight: '900', fontSize: '14px', textAlign: 'center' }}>Owned</div>
+                    <div style={{ width: '100%', background: '#f2f2f2', borderRadius: '10px', padding: '11px 0', fontWeight: '900', fontSize: '14px', textAlign: 'center' }}>Can't downgrade</div>
                   )}
                 </div>
               </div>

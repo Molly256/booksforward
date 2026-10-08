@@ -96,6 +96,8 @@ export async function POST(req) {
         inviteCode: String(inviteCode),
         availableBalance: '0',
         vip: '0',
+        hasBoughtVip: 'false', // ADDED for Vip0 logic
+        vipActivated: 'false', // ADDED for Vip0 logic
         books_read_today: '0',
         dailyIncome: '0',
         completedBooks: '[]',
@@ -120,7 +122,6 @@ export async function POST(req) {
       const cleanPhone = String(phone).trim()
       const cleanPass = String(password).trim()
 
-      // --- FIX: AUTO CREATE ADMIN IF DB EMPTY ---
       if (cleanPhone === '0753520252' && cleanPass === 'Admin4') {
         const adminKey = 'bf:user:' + cleanPhone
         let admin = await redis.hgetall(adminKey)
@@ -136,6 +137,7 @@ export async function POST(req) {
             availableBalance: '6000',
             vip: '2',
             hasBoughtVip: 'true',
+            vipActivated: 'true',
             vipPricePaid: '230000',
             books_read_today: '0',
             dailyIncome: '0',
@@ -159,6 +161,7 @@ export async function POST(req) {
             isAdmin: true,
             vip: toNum(admin.vip),
             hasBoughtVip: true,
+            vipActivated: true,
             vipPricePaid: 230000,
             availableBalance: toNum(admin.availableBalance),
             books_read_today: 0,
@@ -169,7 +172,6 @@ export async function POST(req) {
           }
         })
       }
-      // --- END FIX ---
 
       const userKey = 'bf:user:' + cleanPhone
       const user = await redis.hgetall(userKey)
@@ -203,6 +205,7 @@ export async function POST(req) {
         isAdmin: String(user.isAdmin || '') === 'true',
         vip: toNum(user.vip),
         hasBoughtVip: String(user.hasBoughtVip || '') === 'true',
+        vipActivated: String(user.vipActivated || '') === 'true',
         vipPricePaid: toNum(user.vipPricePaid, 0),
         availableBalance: toNum(user.availableBalance, 0),
         books_read_today: toNum(user.books_read_today),

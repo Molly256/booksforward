@@ -5,6 +5,7 @@ import { Redis } from '@upstash/redis'
 import { NextResponse } from 'next/server'
 
 const redis = Redis.fromEnv()
+const P = 'bf:';
 
 function getUgandaDateString() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' })
@@ -20,15 +21,13 @@ export async function GET(req) {
       return NextResponse.json({ success: false, message: 'Missing phone' }, { status: 400 })
     }
 
-    // 1. Check user exists
-    const userKey = `user:${phone}`
+    const userKey = `${P}user:${phone}`
     const user = await redis.hgetall(userKey)
     if (!user || !user.phone) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
 
-    // 2. READ SET: books:0753520252:2026-06-27
-    const setKey = `books:${phone}:${date}`
+    const setKey = `${P}books:${phone}:${date}`
     const bookIds = await redis.smembers(setKey)
     
     if (!bookIds || bookIds.length === 0) {
@@ -47,11 +46,9 @@ export async function GET(req) {
       })
     }
 
-    // 3. READ HASH: book:0753520252:2026-06-27:40739 x4
-    const bookKeys = bookIds.map(id => `book:${phone}:${date}:${id}`)
+    const bookKeys = bookIds.map(id => `${P}book:${phone}:${date}:${id}`)
     const booksData = await Promise.all(bookKeys.map(k => redis.hgetall(k)))
     
-    // 4. Return raw Redis data. No joins, no fs.
     const books = booksData
       .filter(b => b && b.bookId) 
       .map(b => ({
@@ -69,7 +66,7 @@ export async function GET(req) {
       success: true,
       date,
       setKey,
-      bookIds, // shows you what was in the SET
+      bookIds,
       user: {
         vip: Number(user.vip || 0),
         availableBalance: Number(user.availableBalance || 0),

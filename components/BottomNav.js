@@ -14,6 +14,7 @@ export default function BottomNav() {
 
   const navItems = [
     { href: '/dashboard', icon: '🏠', label: 'Home' },
+    { href: '/viplevels', icon: '👑', label: 'VipLevels' },
     { href: '/books', icon: '📚', label: 'Tasks' },
     { href: '/my', icon: '👤', label: 'My' },
   ]
@@ -34,13 +35,17 @@ export default function BottomNav() {
       borderTop: '1px solid #F1F5F9', 
       boxShadow: '0 -4px 16px rgba(0,0,0,0.06)', 
       margin: '0 auto', 
-      padding: '0 20px 10px 20px', 
+      padding: '0 10px 10px 10px', 
       zIndex: 99999, 
       boxSizing: 'border-box',
-      gap: '8px' 
+      gap: '4px' 
     }}>
       {navItems.map(item => {
-        const isActive = pathname === item.href || (item.href === '/dashboard' && pathname.startsWith('/dashboard/')) || (item.href === '/my' && pathname.startsWith('/my')) || (item.href === '/books' && pathname.startsWith('/books'))
+        const isActive = pathname === item.href || 
+          (item.href === '/dashboard' && pathname.startsWith('/dashboard/')) || 
+          (item.href === '/my' && pathname.startsWith('/my')) || 
+          (item.href === '/books' && pathname.startsWith('/books')) ||
+          (item.href === '/viplevels' && pathname.startsWith('/viplevels'))
         return (
           <Link key={item.href} href={item.href} style={{ 
             textDecoration: 'none', 
@@ -68,7 +73,7 @@ export default function BottomNav() {
               {item.icon}
             </span>
             <span style={{ 
-              fontSize: '11px', 
+              fontSize: '10px', 
               fontWeight: '900', 
               color: isActive ? '#fff' : '#8E8E93',
               transition: 'color 0.2s ease'
