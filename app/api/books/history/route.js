@@ -11,14 +11,27 @@ export async function GET(request) {
     const phone = searchParams.get('phone');
     if (!phone) return NextResponse.json({ success: true, history: [] });
 
-    // Get permanent transaction history - this is where submit pushes
+    // 1. permanent history
     const historyKey = `bf:tx:${phone}:history`;
-    const list = await redis.lrange(historyKey, 0, 200);
+    const permanent = await redis.lrange(historyKey, 0, 200);
 
-    const history = list.map(str => {
+    // 2. also check today's tx (for old data before fix)
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' });
+    const todayKey = `bf:tx:${phone}:${today}`;
+    const todayList = await redis.lrange(todayKey, 0, 200);
+
+    // Merge & deduplicate by id
+    const allRaw = [...permanent, ...todayList];
+    const seen = new Set();
+    const history = [];
+
+    for (const str of allRaw) {
       try {
-        const tx = JSON.parse(str);
-        return {
+        const tx = typeof str === 'string' ? JSON.parse(str) : str;
+        const uniq = tx.id || `${tx.bookId}-${tx.createdAt}`;
+        if (seen.has(uniq)) continue;
+        seen.add(uniq);
+        history.push({
           id: tx.bookId || tx.id,
           bookId: tx.bookId,
           title: tx.bookTitle || `Book ${tx.bookId}`,
@@ -27,9 +40,12 @@ export async function GET(request) {
           cover: `/books/covers/${tx.bookId}.jpg`,
           completedAt: tx.createdAt,
           status: 'submitted'
-        };
-      } catch { return null; }
-    }).filter(Boolean);
+        });
+      } catch {}
+    }
+
+    // Sort newest first
+    history.sort((a,b) => (b.completedAt||'').localeCompare(a.completedAt||''));
 
     return NextResponse.json({ success: true, history }, {
       headers: { 'Cache-Control': 'no-store' }
