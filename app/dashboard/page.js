@@ -50,7 +50,7 @@ export default function Dashboard() {
     { icon: '🎰', label: 'Magical Wheel', href: '/magicalwheel' },
     { icon: '🎁', label: 'Invite', href: '/invite' },
     { icon: '📲', label: 'Download App', href: '/downloadapp' },
-    { icon: '🤝', label: 'Team', href: '/myteam' },
+    { icon: '🤝', label: 'Team', href: '/team' },
     { icon: '🌍', label: 'About', href: '/about' },
   ]
 
