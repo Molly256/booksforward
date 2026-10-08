@@ -9,10 +9,10 @@ const P = 'bf:'
 
 const getLabel = (tx) => {
   const t = String(tx.type || '').toLowerCase().trim()
-  if (t === 'buy_vip' || t === 'vip') return `VIP ${tx.vipLevel || ''} Purchase`.trim()
-  if (t === 'deposit' || t === 'system increase') return t === 'system increase' ? 'SYSTEM INCREASE' : 'Deposit'
+  if (t === 'buy_vip' || t === 'vip' || t === 'upgrade' || t === 'upgrade_vip' || t === 'viplevel purchase') return `VIP ${tx.vipLevel || ''} Purchase`.trim()
+  if (t === 'deposit' || t === 'system increase') return t === 'system increase'? 'SYSTEM INCREASE' : 'Deposit'
   if (t === 'withdraw') return 'Withdraw'
-  if (t === 'refund_vip') return 'VIP Refund'
+  if (t === 'refund_vip' || t === 'refund') return 'VIP Refund'
   if (t === 'daily_income' || t === 'book_income' || t === 'daily income') return 'Daily Income'
   if (t === 'team_a_payout') return 'Team A Commission'
   if (t === 'team_b_payout') return 'Team B Commission'
@@ -31,7 +31,6 @@ function getUgandaDateString() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' });
 }
 function getUgandaDateTimeString() {
-  // FIXED: YYYY-MM-DD HH:mm:ss with hour-minute-seconds
   return new Date().toLocaleString("en-CA", { timeZone: "Africa/Kampala", hour12: false }).replace(',', '').slice(0,19);
 }
 function getUgandaNow() {
@@ -41,15 +40,12 @@ function getUgandaNow() {
 export async function POST(req) {
   try {
     const body = await req.json()
-    const { type, phone, amount, method, withdrawPhone, withdrawName, bookTitle, vipLevel, id: customId, note } = body
+    const { type, phone, amount, method, withdrawPhone, withdrawName, bookTitle, vipLevel, id: customId, note, billedPhone, proofImage } = body
     if (!type ||!phone ||!amount) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
 
     const cleanType = String(type).toLowerCase().trim()
 
-    // Allow system_increase ONLY if coming from admin (block for normal users)
-    // Normal users cannot spoof it, but admin route uses direct redis push
     if (cleanType === 'system_increase' || cleanType === 'registration_reward') {
-      // Keep blocked for user-facing POST - admin uses /api/admin
       return NextResponse.json({ error: 'Transaction type disabled' }, { status: 400 })
     }
     if (cleanType.includes('share')) {
@@ -60,6 +56,7 @@ export async function POST(req) {
     if (isNaN(amt) || amt <= 0) return NextResponse.json({ error: 'Invalid amount value' }, { status: 400 })
 
     const isWithdrawal = cleanType === 'withdraw'
+    const isDeposit = cleanType === 'deposit'
 
     if (isWithdrawal) {
       const ugandaDate = getUgandaNow();
@@ -67,6 +64,12 @@ export async function POST(req) {
       if (day === 0 || day === 6) return NextResponse.json({ error: 'No withdraw on weekends! Monday to Friday only.' }, { status: 400 })
       const totalSec = ugandaDate.getHours()*3600 + ugandaDate.getMinutes()*60 + ugandaDate.getSeconds()
       if (totalSec < 11*3600 || totalSec >= 18*3600) return NextResponse.json({ error: 'Withdrawals only open 11:00 AM - 6:00 PM Ugandan Time.' }, { status: 400 })
+    }
+
+    // Deposit validation: need billedPhone + proofImage
+    if (isDeposit) {
+      if (!billedPhone) return NextResponse.json({ error: 'Billed number required' }, { status: 400 })
+      if (!proofImage) return NextResponse.json({ error: 'Proof image required' }, { status: 400 })
     }
 
     const userKey = `${P}user:${phone}`
@@ -83,24 +86,26 @@ export async function POST(req) {
     if (cleanType === 'deposit' || isWithdrawal) status = 'pending'
 
     const dateStr = getUgandaDateString();
-    const timeStr = getUgandaDateTimeString(); // YYYY-MM-DD HH:mm:ss
+    const timeStr = getUgandaDateTimeString();
 
-    const tx = { 
-      id, 
-      type: cleanType === 'lucky wheel' ? 'magical wheel' : cleanType === 'myteam' ? 'team' : cleanType, 
-      label: getLabel({type: cleanType, vipLevel}), 
-      amount: String(amount), 
-      status, 
-      createdAt: timeStr, 
+    const tx = {
+      id,
+      type: cleanType === 'lucky wheel'? 'magical wheel' : cleanType === 'myteam'? 'team' : (cleanType === 'upgrade' || cleanType === 'upgrade_vip')? 'viplevel purchase' : cleanType,
+      label: getLabel({type: cleanType, vipLevel}),
+      amount: String(amount),
+      status,
+      createdAt: timeStr,
       timestamp: timeStr,
       updatedAt: timeStr,
-      phone, 
-      method: method || '', 
-      withdrawPhone: withdrawPhone || '', 
-      withdrawName: withdrawName || '', 
-      bookTitle: bookTitle || '', 
-      vipLevel: String(vipLevel || ''), 
-      note: note || '' 
+      phone,
+      method: method || '',
+      billedPhone: billedPhone || '',
+      proofImage: proofImage || '',
+      withdrawPhone: withdrawPhone || '',
+      withdrawName: withdrawName || '',
+      bookTitle: bookTitle || '',
+      vipLevel: String(vipLevel || ''),
+      note: note || ''
     }
 
     const txString = JSON.stringify(tx)
@@ -148,35 +153,35 @@ export async function GET(request) {
 
       let uiType = String(tx.type || '').toLowerCase().trim();
 
-      // REMOVE only shares - KEEP system_increase for admin deposits
       if (uiType.includes('share')) continue;
       if (uiType === 'registration_reward') continue;
 
-      if (uiType === 'buy_vip') uiType = 'vip'
+      if (uiType === 'buy_vip' || uiType === 'upgrade' || uiType === 'upgrade_vip' || uiType === 'viplevel' || uiType === 'viplevel_purchase') uiType = 'viplevel purchase'
       if (uiType === 'daily_income' || uiType === 'book_income') uiType = 'daily income'
       if (uiType === 'lucky wheel' || uiType === 'lucky_wheel' || uiType === 'wheel') uiType = 'magical wheel'
       if (uiType === 'myteam') uiType = 'team'
-      if (uiType === 'system_increase') uiType = 'system increase' // keep visible
+      if (uiType === 'system_increase') uiType = 'system increase'
 
-      // ensure YYYY-MM-DD HH:mm:ss
       let created = tx.createdAt || tx.timestamp || getUgandaDateTimeString()
       created = String(created).slice(0,19)
 
       transactions.push({
-        id: String(tx.id), 
-        type: uiType, 
-        label: tx.label || getLabel({...tx, type: uiType}), 
-        amount: String(tx.amount), 
-        note: tx.note || '', 
-        status: (tx.status === 'completed' || tx.status === 'success')? 'success' : tx.status, 
+        id: String(tx.id),
+        type: uiType,
+        label: tx.label || getLabel({...tx, type: uiType}),
+        amount: String(tx.amount),
+        note: tx.note || '',
+        status: (tx.status === 'completed' || tx.status === 'success')? 'success' : tx.status,
         createdAt: created,
         timestamp: created,
         updatedAt: tx.updatedAt || created,
-        phone: tx.phone || phone, 
-        method: tx.method || '', 
-        withdrawPhone: tx.withdrawPhone || '', 
-        withdrawName: tx.withdrawName || '', 
-        bookTitle: tx.bookTitle || '', 
+        phone: tx.phone || phone,
+        billedPhone: tx.billedPhone || '',
+        proofImage: tx.proofImage || '',
+        method: tx.method || '',
+        withdrawPhone: tx.withdrawPhone || '',
+        withdrawName: tx.withdrawName || '',
+        bookTitle: tx.bookTitle || '',
         vipLevel: tx.vipLevel || ''
       });
     }

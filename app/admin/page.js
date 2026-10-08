@@ -6,6 +6,18 @@ const P = 'bf:'
 const getUgandaDate = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' })
 const getUgandaDateTime = () => new Date().toLocaleString('en-CA', { timeZone: 'Africa/Kampala', hour12: false }).replace(',', '').slice(0,19)
 
+function splitUgDate(input) {
+  if (!input) return { date: '', time: '' }
+  const s = String(input).slice(0,19)
+  const [d, t] = s.split(' ')
+  if (d && t) return { date: d, time: t }
+  if (s.includes('T')) {
+    const [dd, tt] = s.split('T')
+    return { date: dd, time: tt }
+  }
+  return { date: s.slice(0,10), time: s.slice(11,19) }
+}
+
 export default function Admin() {
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -23,6 +35,7 @@ export default function Admin() {
   const [depositFoundUser, setDepositFoundUser] = useState(null)
   const [showDepositBox, setShowDepositBox] = useState(false)
   const [depositAmount, setDepositAmount] = useState('')
+  const [viewImage, setViewImage] = useState(null)
 
   const ADMIN_PHONE = '0753520252'
 
@@ -43,11 +56,8 @@ export default function Admin() {
 
   const loadHistories = async () => {
     const today = getUgandaDate()
-    // 1. localStorage (instant)
     const dLocal = JSON.parse(localStorage.getItem(`${P}admin_deposit_history`) || '[]').filter(h => h.date === today)
     const wLocal = JSON.parse(localStorage.getItem(`${P}admin_withdraw_history`) || '[]').filter(h => h.date === today)
-
-    // 2. Redis backend (with hour-minute-second + auto 24hr expire)
     try {
       const [dRes, wRes] = await Promise.all([
         fetch('/api/admin?action=deposit_history').then(r=>r.json()).catch(()=>({history:[]})),
@@ -55,11 +65,13 @@ export default function Admin() {
       ])
       const dRedis = (dRes.history||[]).map(tx => ({
         phone: tx.phone,
+        billedPhone: tx.billedPhone || '',
         amount: tx.amount,
         status: tx.status,
         date: tx.createdAt?.slice(0,10) || today,
-        timestamp: tx.updatedAt || tx.createdAt, // YYYY-MM-DD HH:mm:ss
+        timestamp: tx.updatedAt || tx.createdAt,
         createdAt: tx.createdAt,
+        proofImage: tx.proofImage || '',
         withdrawPhone: tx.withdrawPhone,
         method: tx.method
       }))
@@ -74,7 +86,6 @@ export default function Admin() {
         withdrawName: tx.withdrawName,
         method: tx.method
       }))
-      // merge redis + local, dedup
       setDepositHistory([...dRedis,...dLocal].slice(0,50))
       setWithdrawHistory([...wRedis,...wLocal].slice(0,50))
     } catch {
@@ -106,7 +117,7 @@ export default function Admin() {
     if (data.success) {
       showToast(`Transaction ${action}`)
       if (isDeposit) {
-        saveToHistory('deposit', { phone: tx.phone, amount: tx.amount, status: action, createdAt: getUgandaDateTime() })
+        saveToHistory('deposit', { phone: tx.phone, billedPhone: tx.billedPhone, amount: tx.amount, status: action, createdAt: getUgandaDateTime(), proofImage: tx.proofImage })
       } else {
         saveToHistory('withdraw', {
           phone: tx.phone, amount: tx.amount,
@@ -171,6 +182,11 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-white p-4 pb-24 max-w-[600px] mx-auto">
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[99999] bg-black text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">{toast}</div>}
+      {viewImage && (
+        <div onClick={()=>setViewImage(null)} className="fixed inset-0 z-[100000] bg-black/80 flex items-center justify-center p-4">
+          <img src={viewImage} className="max-w-full max-h-[90vh] rounded-xl" />
+        </div>
+      )}
 
       <div className="flex items-center gap-3 mb-4">
         <button onClick={() => router.push('/dashboard')} className="text-2xl text-black">←</button>
@@ -191,33 +207,54 @@ export default function Admin() {
         <div className="mb-8">
           <h2 className="text-[13px] font-black mb-2">Deposit Pending</h2>
           {loading? <p className="text-black">Loading...</p> : depositPending.length===0? <p className="text-gray-500 text-sm">No deposit pending</p> : (
-            <div className="flex flex-col gap-3">
-              {depositPending.map(tx => (
-                <div key={tx.id} className="border rounded-xl p-3 bg-gray-50">
-                  <p className="font-black text-sm border-b pb-1 mb-1">{tx.type.toUpperCase()} - {Number(tx.amount).toLocaleString()} shs</p>
-                  <p className="text-xs font-bold">User: <span className="font-black">{tx.phone}</span></p>
-                  <p className="text-xs font-bold">Method: {tx.method}</p>
-                  <p className="text-[10px] text-gray-500 mt-1 font-mono">{tx.createdAt}</p>
-                  <div className="flex gap-2 mt-2">
-                    <button onClick={() => handleAction(tx,'success')} className="px-4 py-2 bg-green-500 text-white rounded-lg text-xs font-bold">Approve</button>
-                    <button onClick={() => handleAction(tx,'failed')} className="px-4 py-2 bg-red-500 text-white rounded-lg text-xs font-bold">Reject</button>
+            <div className="flex flex-col gap-4">
+              {depositPending.map(tx => {
+                const { date, time } = splitUgDate(tx.createdAt || tx.timestamp)
+                return (
+                <div key={tx.id} className="border-2 border-black rounded-xl p-3 bg-gray-50">
+                  <p className="font-black text-sm border-b border-black pb-2 mb-2">{tx.type?.toUpperCase()} - {Number(tx.amount).toLocaleString()} shs</p>
+
+                  <div className="space-y-1 text-[12px]">
+                    <p><span className="font-bold text-gray-600">Account No:</span> <span className="font-black text-black">{tx.phone}</span> <span className="text-[10px] text-gray-500">(registered)</span></p>
+                    <p><span className="font-bold text-gray-600">Billed No:</span> <span className="font-black text-blue-600">{tx.billedPhone || 'N/A'}</span> <span className="text-[10px] text-gray-500">(sent money)</span></p>
+                    <p><span className="font-bold text-gray-600">Amount:</span> <span className="font-black">{Number(tx.amount).toLocaleString()} shs</span></p>
+                    <p><span className="font-bold text-gray-600">Method:</span> {tx.method || 'N/A'}</p>
+                    <div className="pt-1">
+                      <p className="font-bold text-gray-600 text-[11px]">Proof Image:</p>
+                      {tx.proofImage? (
+                        <img onClick={()=>setViewImage(tx.proofImage)} src={tx.proofImage} alt="proof" className="mt-1 w-full h-48 object-contain bg-white rounded-lg border cursor-pointer" />
+                      ) : <p className="text-red-500 text-[11px]">No image uploaded</p>}
+                    </div>
+                    <div className="bg-black text-white px-2 py-1 rounded mt-2 font-mono text-[11px]">
+                      <p>📅 Date: {date}</p>
+                      <p>🕒 Time: {time} UGA</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 mt-3">
+                    <button onClick={() => handleAction(tx,'success')} className="flex-1 py-2.5 bg-green-500 text-white rounded-lg text-xs font-black">APPROVE ✅</button>
+                    <button onClick={() => handleAction(tx,'failed')} className="flex-1 py-2.5 bg-red-500 text-white rounded-lg text-xs font-black">REJECT ❌</button>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
           <div className="mt-6 bg-[#FFF9C4] border rounded-xl p-3">
-            <h3 className="font-black text-xs mb-2">Deposit History Today (auto clears 24hrs) - YYYY-MM-DD HH:mm:ss</h3>
-            {depositHistory.length===0? <p className="text-[11px] text-gray-500">No history today</p> : depositHistory.map((h,i) => (
-              <div key={i} className="flex justify-between border-b py-2 text-[11px]">
-                <div>
-                  <p className="font-black">{h.phone} - {Number(h.amount).toLocaleString()} shs</p>
-                  <p className={`font-bold ${h.status==='success'?'text-green-600':h.status==='failed'?'text-red-600':'text-blue-600'}`}>{h.status.toUpperCase()}</p>
-                  <p className="text-[10px] text-black font-mono font-bold">🕒 {h.createdAt || h.timestamp} </p>
+            <h3 className="font-black text-xs mb-2">Deposit History Today (auto clears 24hrs)</h3>
+            {depositHistory.length===0? <p className="text-[11px] text-gray-500">No history today</p> : depositHistory.map((h,i) => {
+              const { date, time } = splitUgDate(h.createdAt || h.timestamp)
+              return (
+              <div key={i} className="flex justify-between border-b py-2 text-[11px] gap-2">
+                <div className="flex-1">
+                  <p className="font-black">{h.phone} {h.billedPhone? `| Billed: ${h.billedPhone}` : ''} - {Number(h.amount).toLocaleString()} shs</p>
+                  <p className={`font-bold ${h.status==='success'?'text-green-600':h.status==='failed'?'text-red-600':'text-blue-600'}`}>{h.status?.toUpperCase()}</p>
+                  <p className="text-[10px] font-mono">📅 {date} 🕒 {time}</p>
                 </div>
+                {h.proofImage && <img onClick={()=>setViewImage(h.proofImage)} src={h.proofImage} className="w-12 h-12 object-cover rounded border cursor-pointer" />}
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}
@@ -227,7 +264,9 @@ export default function Admin() {
           <h2 className="text-[13px] font-black mb-2">Withdraw Pending</h2>
           {loading? <p className="text-black">Loading...</p> : withdrawPending.length===0? <p className="text-gray-500 text-sm">No withdraw pending</p> : (
             <div className="flex flex-col gap-3">
-              {withdrawPending.map(tx => (
+              {withdrawPending.map(tx => {
+                const { date, time } = splitUgDate(tx.createdAt)
+                return (
                 <div key={tx.id} className="border rounded-xl p-3 bg-gray-50">
                   <p className="font-black text-sm border-b pb-1 mb-1">WITHDRAW - {Number(tx.amount).toLocaleString()} shs</p>
                   <div className="flex flex-col gap-1 text-xs font-bold">
@@ -235,28 +274,28 @@ export default function Admin() {
                     <p>Target No: <span className="text-blue-600">{tx.withdrawPhone || tx.phoneNumber}</span></p>
                     <p>Account Name: {tx.withdrawName || tx.accountName}</p>
                     <p>Network: {tx.method}</p>
-                    <p className="text-[10px] font-normal text-gray-500 font-mono">{tx.createdAt}</p>
+                    <p className="text-[10px] font-mono bg-black text-white px-2 py-1 rounded mt-1">{date} {time} UGA</p>
                   </div>
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => handleAction(tx,'success')} className="px-4 py-2 bg-green-500 text-white rounded-lg text-xs font-bold">Approve</button>
                     <button onClick={() => handleAction(tx,'failed')} className="px-4 py-2 bg-red-500 text-white rounded-lg text-xs font-bold">Reject</button>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           )}
 
           <div className="mt-6 bg-[#FFEBEE] border rounded-xl p-3">
-            <h3 className="font-black text-xs mb-2">Withdraw History Today (auto clears 24hrs) - YYYY-MM-DD HH:mm:ss</h3>
-            {withdrawHistory.length===0? <p className="text-[11px] text-gray-500">No history today</p> : withdrawHistory.map((h,i) => (
+            <h3 className="font-black text-xs mb-2">Withdraw History Today</h3>
+            {withdrawHistory.length===0? <p className="text-[11px] text-gray-500">No history today</p> : withdrawHistory.map((h,i) => {
+              const { date, time } = splitUgDate(h.createdAt || h.timestamp)
+              return (
               <div key={i} className="border-b py-2 text-[11px]">
-                <p className="font-black">{h.phone} - {Number(h.amount).toLocaleString()} shs - {h.status.toUpperCase()}</p>
-                <p>Account: {h.withdrawPhone || h.phone} | Target: {h.withdrawPhone} | Network: {h.method}</p>
-                <p>Amount: {Number(h.amount).toLocaleString()} | Status: {h.status}</p>
-                <p className="text-[10px] text-black font-mono font-bold mt-1">🕒 {h.createdAt || h.timestamp}</p>
-                <p className="text-[10px] text-gray-500 font-mono">📅 {h.date} Uganda Calendar</p>
+                <p className="font-black">{h.phone} - {Number(h.amount).toLocaleString()} shs - {h.status?.toUpperCase()}</p>
+                <p>Target: {h.withdrawPhone} | Network: {h.method}</p>
+                <p className="text-[10px] font-mono font-bold">🕒 {date} {time} UGA</p>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}

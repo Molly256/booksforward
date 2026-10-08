@@ -6,6 +6,9 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -18,10 +21,10 @@ export async function POST(request) {
       );
     }
 
-    const userKey = `user:${phone}`;
-    const txKey = `tx:${phone}:history`;
+    const cleanPhone = String(phone).trim();
+    const userKey = `user:${cleanPhone}`;
+    const txKey = `tx:${cleanPhone}:history`;
 
-    // Check spins first - can't pipeline this one
     const currentSpins = parseInt(await redis.hget(userKey, 'spins') || '0', 10);
 
     if (currentSpins < 1) {
@@ -34,22 +37,27 @@ export async function POST(request) {
     const prizeAmount = 2000;
     const timestamp = Date.now();
 
+    // NEW BF STYLE TX - matches current app style
     const txData = {
-      id: `tx_${timestamp}_wheel`,
-      type: 'system_increase',
-      label: 'Lucky Wheel Win',
-      amount: prizeAmount.toString(),
+      id: `bf_${timestamp}_wheel`,
+      type: 'bf_system_increase',
+      txType: 'bf_system_increase',
+      label: 'bf_lucky_wheel_win',
+      note: 'bf_lucky_wheel_win 2000 shs',
+      amount: prizeAmount, // keep as number like commission does
       timestamp: timestamp,
-      status: 'completed'
+      createdAt: timestamp,
+      status: 'completed',
+      currency: 'shs',
+      source: 'bf_wheel'
     };
 
-    // Single pipeline for all writes + reads
     const pipeline = redis.pipeline();
     pipeline.hincrby(userKey, 'spins', -1);
     pipeline.hincrby(userKey, 'availableBalance', prizeAmount);
     pipeline.lpush(txKey, JSON.stringify(txData));
-    pipeline.hget(userKey, 'spins'); // index 3
-    pipeline.hget(userKey, 'availableBalance'); // index 4
+    pipeline.hget(userKey, 'spins');
+    pipeline.hget(userKey, 'availableBalance');
 
     const results = await pipeline.exec();
 
@@ -57,12 +65,12 @@ export async function POST(request) {
       success: true,
       winningSliceIndex: 0,
       prizeAmount: prizeAmount,
-      remainingSpins: Number(results[3].result || 0),
-      newBalance: Number(results[4].result || 0)
+      remainingSpins: Number(results[3] || 0),
+      newBalance: Number(results[4] || 0)
     });
 
   } catch (error) {
-    console.error("Database Engine Spin Transaction Failure:", error);
+    console.error("BF Wheel Spin Failure:", error);
     return NextResponse.json(
       { success: false, error: "Internal Server Processing Error." },
       { status: 500 }

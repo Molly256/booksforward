@@ -13,9 +13,6 @@ const toNum = function(v, f) {
   return Number.isNaN(n) ? f : n;
 };
 
-/**
- * GET: Pulls live downlines with VIP levels and adds up all commission entries
- */
 export async function GET(request) {
   try {
     const url = new URL(request.url);
@@ -27,7 +24,7 @@ export async function GET(request) {
 
     const cleanPhone = String(phone).trim();
 
-    // 1. Fetch downlines hierarchy tree from Redis
+    // 1. Fetch downlines
     const downlinesData = await redis.hgetall('downlines:' + cleanPhone);
     const downlines = downlinesData && typeof downlinesData === 'object' ? downlinesData : {};
     
@@ -46,34 +43,38 @@ export async function GET(request) {
     const cleanListB = cleanListA.length === 0 ? [] : rawListB;
     const cleanListC = (cleanListA.length === 0 || cleanListB.length === 0) ? [] : rawListC;
 
-    // --- NEW: FETCH VIP LEVELS FOR ALL TEAM MEMBERS IN BULK ---
-    // Gather all unique phone numbers from your active teams
+    // 2. FETCH VIP LEVELS - include vip0 to vip4
     const allMembers = [...cleanListA, ...cleanListB, ...cleanListC];
     const vipMap = {};
 
     if (allMembers.length > 0) {
-      // Use an Upstash Redis pipeline to fetch all VIP data in a single round-trip
       const pipeline = redis.pipeline();
       allMembers.forEach(function(memberPhone) {
-        // Looks up the master profile data hash where user data is kept
         pipeline.hget('user:' + memberPhone, 'vip');
       });
-      
       const pipelineResults = await pipeline.exec();
-      
-      // Map the array results back to their matching phone numbers
       allMembers.forEach(function(memberPhone, index) {
-        const vipValue = pipelineResults[index];
-        vipMap[memberPhone] = vipValue ? String(vipValue).toLowerCase().trim() : '';
+        let vipValue = pipelineResults[index];
+        if (!vipValue) {
+          vipMap[memberPhone] = 'vip0';
+        } else {
+          let v = String(vipValue).toLowerCase().trim();
+          if (v === '0' || v === '') v = 'vip0';
+          if (v === '1') v = 'vip1';
+          if (v === '2') v = 'vip2';
+          if (v === '3') v = 'vip3';
+          if (v === '4') v = 'vip4';
+          if (!['vip0','vip1','vip2','vip3','vip4'].includes(v)) v = 'vip0';
+          vipMap[memberPhone] = v;
+        }
       });
     }
 
-    // Convert flat phone arrays into structured objects containing both phone numbers and VIP level labels
     const formatTeamList = function(phoneArray) {
       return phoneArray.map(function(memberPhone) {
         return {
           phone: memberPhone,
-          vip: vipMap[memberPhone] || '' // returns 'vip1', 'vip2', 'vip3', etc.
+          vip: vipMap[memberPhone] || 'vip0'
         };
       });
     };
@@ -81,13 +82,11 @@ export async function GET(request) {
     const finalResultListA = formatTeamList(cleanListA);
     const finalResultListB = formatTeamList(cleanListB);
     const finalResultListC = formatTeamList(cleanListC);
-    // ----------------------------------------------------------
 
-    // 2. Read user transactions exclusively from the master history key path
+    // 3. Read tx history
     const historyKey = `tx:${cleanPhone}:history`;
     const rawHistory = await redis.lrange(historyKey, 0, -1) || [];
     
-    // Parse raw strings into clean objects safely
     const history = rawHistory.map(function(item) {
       if (!item) return null;
       try {
@@ -97,13 +96,15 @@ export async function GET(request) {
       }
     }).filter(Boolean);
 
-    // 3. REAL-TIME ACCUMULATOR ENGINE: Targets transactions explicitly labeled as "commission"
+    // 4. BF PREFIX ACCUMULATOR - only bf commissions
     const cumulativeCommission = history.reduce(function(sum, tx) {
       const txLabel = String(tx.label || '').toLowerCase().trim();
       const txType = String(tx.type || '').toLowerCase().trim();
       const txNote = String(tx.note || '').toLowerCase().trim();
-      
-      if (
+
+      const isBF = txType.startsWith('bf') || txLabel.startsWith('bf') || txType.includes('bf_') || txLabel.includes('bf_') || txType.includes('bfcommission') || txLabel.includes('bfcommission');
+
+      const isCommission = 
         txLabel === 'commission' ||
         txLabel.includes('commission') ||
         txType === 'commission' || 
@@ -111,30 +112,39 @@ export async function GET(request) {
         txType === 'team_a_payout' ||
         txType === 'team_b_payout' ||
         txType === 'team_c_payout' ||
-        txNote.includes('commission')
-      ) {
+        txType.includes('commission') ||
+        txNote.includes('commission');
+
+      // MUST be both bf AND commission
+      if (isBF && isCommission) {
         return sum + Math.abs(toNum(tx.amount, 0));
       }
+
+      // fallback: also support new direct types like bf_commission, bf_team_a etc
+      if (txType.startsWith('bf') && (txType.includes('commission') || txType.includes('team'))) {
+        return sum + Math.abs(toNum(tx.amount, 0));
+      }
+
       return sum;
     }, 0);
 
-    // 4. Return the live data payload to your frontend layout elements
     return NextResponse.json({
       success: true,
       total: cumulativeCommission, 
-      teamCommissionTotal: cumulativeCommission,        
+      teamCommissionTotal: cumulativeCommission,
+      transactions: history, // keep for frontend bf filter
       breakdown: {
         teamA: cleanListA.length, 
         teamB: cleanListB.length, 
         teamC: cleanListC.length
       },
-      listA: finalResultListA, // Now returns arrays of objects containing VIP levels
+      listA: finalResultListA,
       listB: finalResultListB, 
       listC: finalResultListC  
     }, { status: 200 });
 
   } catch (error) {
-    console.error('Fatal API endpoint crash in GET /api/myteam/total:', error);
+    console.error('Fatal API crash in GET /api/team:', error);
     return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
   }
 }

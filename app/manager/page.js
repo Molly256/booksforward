@@ -3,10 +3,10 @@ import Card from '../../components/Card'
 
 export default function ManagerPage() {
   const managers = [
-    { name: "Alicia", phone: "447451296569" }
+    { name: "Jenn Vance", phone: "15513377400" }
   ]
 
-  const getWaLink = (phone) => `https://wa.me/${phone}?text=Hello%20Alicia%20-%20BooksForward%20PR`
+  const getWaLink = (phone) => `https://wa.me/${phone}?text=${encodeURIComponent('hello 👋 manager Jenn Vance')}`
 
   return (
     <Card>
@@ -14,7 +14,7 @@ export default function ManagerPage() {
         minHeight: '100vh',
         background: '#FFFFFF',
         padding: '20px',
-        paddingBottom: '96px', // space for BottomNav
+        paddingBottom: '96px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -35,7 +35,7 @@ export default function ManagerPage() {
           <h1 style={{ 
             fontSize: '24px', 
             fontWeight: '900', 
-            color: '#00BFFF',
+            color: '#00C853',
             marginBottom: '12px'
           }}>
             Contact Manager
@@ -52,7 +52,7 @@ export default function ManagerPage() {
             We reply within 5 minutes.
           </p>
 
-          {managers.map((mgr, idx) => (
+          {managers.map((mgr) => (
             <button 
               key={mgr.phone}
               onClick={() => window.open(getWaLink(mgr.phone), "_blank")}
@@ -70,17 +70,7 @@ export default function ManagerPage() {
                 fontWeight: '900',
                 fontSize: '16px',
                 boxShadow: '0 4px 12px rgba(37, 211, 102, 0.3)',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                marginBottom: idx < managers.length - 1 ? '12px' : '0'
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = 'scale(0.97)'
-                e.currentTarget.style.boxShadow = '0 2px 6px rgba(37, 211, 102, 0.3)'
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = 'scale(1)'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 211, 102, 0.3)'
+                cursor: 'pointer'
               }}
             >
               👤 Chat with {mgr.name}
@@ -96,7 +86,7 @@ export default function ManagerPage() {
             color: '#666',
             textAlign: 'left'
           }}>
-            <div>📱 Manager Alicia: +447451296569</div>
+            <div>📱 Manager Jenn Vance: +1 (551) 337-7400</div>
           </div>
         </div>
       </main>

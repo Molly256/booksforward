@@ -97,7 +97,6 @@ export default function MagicalWheelPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontFamily: 'sans-serif', minHeight: '100vh', backgroundColor: '#fff' }}>
       
-      {/* HOT GREEN HEADER */}
       <div style={{
         width:'100%',
         background:'#00C853',
@@ -150,24 +149,24 @@ export default function MagicalWheelPage() {
             />
           </div>
 
+          {/* FIXED - CLEAR CENTER, NO BLUR */}
           <button 
             onClick={startLuckyWheelSpin}
             disabled={isSpinning || spins < 1}
             style={{
               position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-              width: '92px', height: '92px', borderRadius: '50%', border: '4px solid #fff',
-              backgroundColor: '#D4EDD1', 
-              color: '#000', fontSize: '10px', fontWeight: '900',
+              width: '90px', height: '90px', borderRadius: '50%', border: '3px solid #fff',
+              backgroundColor: '#FFFFFF', 
+              color: '#000',
               cursor: isSpinning || spins < 1 ? 'not-allowed' : 'pointer', 
-              boxShadow: '0 4px 15px rgba(0,200,83,0.35)',
-              display: 'flex', flexDirection:'column', alignItems: 'center', justifyContent: 'center', zIndex: 12,
-              opacity: isSpinning || spins < 1 ? 0.6 : 1,
-              lineHeight:'10px'
+              boxShadow: '0 3px 12px rgba(0,0,0,0.35)',
+              display: 'flex', flexDirection:'column', alignItems: 'center', justifyContent: 'center', zIndex: 20,
+              opacity: 1,
             }}
           >
-            <span style={{fontSize:'16px', lineHeight:'16px'}}>BF</span>
-            <span>MAGICAL</span>
-            <span>WHEEL</span>
+            <span style={{fontSize:'18px', lineHeight:'18px', fontWeight:900, color:'#000'}}>BF</span>
+            <span style={{fontSize:'9px', lineHeight:'10px', fontWeight:900, color:'#000', marginTop:'2px'}}>MAGICAL</span>
+            <span style={{fontSize:'9px', lineHeight:'10px', fontWeight:900, color:'#000'}}>WHEEL</span>
           </button>
         </div>
 

@@ -7,6 +7,7 @@ export default function Deposit() {
   const [user, setUser] = useState(null)
   const [selectedNetwork, setSelectedNetwork] = useState(null)
   const [amount, setAmount] = useState('')
+  const [billedNumber, setBilledNumber] = useState('')
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -39,11 +40,22 @@ export default function Deposit() {
     }
   }
 
+  const toBase64 = (file) => new Promise((resolve, reject)=>{
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+  })
+
   const handleDeposit = async () => {
     const amt = Number(amount)
 
     if (!amt || amt < 50000) {
       showToast('Minimum deposit is 50,000 UGX')
+      return
+    }
+    if (!billedNumber || billedNumber.trim().length < 9) {
+      showToast('Enter the number that was billed / sent money')
       return
     }
     if (!file) {
@@ -54,6 +66,8 @@ export default function Deposit() {
     setLoading(true)
 
     try {
+      const base64Image = await toBase64(file)
+
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -61,7 +75,10 @@ export default function Deposit() {
           type: 'deposit',
           phone: user.phone,
           amount: amt,
-          method: selectedNetwork
+          method: selectedNetwork,
+          billedPhone: billedNumber.trim(),
+          proofImage: base64Image,
+          status: 'pending'
         })
       })
 
@@ -87,7 +104,6 @@ export default function Deposit() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col relative">
-      {/* BLACK TOAST */}
       {toast && (
         <div style={{
           position: 'fixed',
@@ -191,6 +207,18 @@ export default function Deposit() {
               <p className="text-[11px] text-gray-500 mt-2">Minimum deposit is 50,000 UGX</p>
             </div>
 
+            <div className="mt-5">
+              <label className="text-[13px] font-black text-black">Number that was billed / sent money</label>
+              <input
+                type="tel"
+                placeholder="e.g 077xxxxxxx"
+                value={billedNumber}
+                onChange={(e) => setBilledNumber(e.target.value)}
+                className="w-full mt-2 bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-black text-[15px] outline-none focus:border-[#00c853]"
+              />
+              <p className="text-[11px] text-gray-500 mt-2">Enter the phone that actually deposited</p>
+            </div>
+
             <div className="mt-6">
               <label className="text-[13px] font-black text-black">Upload transaction proof</label>
               <label className="w-full mt-2 border border-dashed border-gray-300 rounded-xl px-4 py-6 flex flex-col items-center justify-center cursor-pointer bg-[#fafafa]">
@@ -214,9 +242,6 @@ export default function Deposit() {
             >
               {loading? 'Processing...' : 'SUBMIT TRANSACTION'}
             </button>
-
-            <p className="text-gray-600 text-[12px] mt-3 text-center">
-            </p>
           </div>
         )}
       </div>
