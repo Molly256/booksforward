@@ -211,7 +211,7 @@ export default function Deposit() {
               <label className="text-[13px] font-black text-black">Number that was billed / sent money</label>
               <input
                 type="tel"
-                placeholder="e.g 077xxxxxxx"
+                placeholder="e.g 07xxxxxxx"
                 value={billedNumber}
                 onChange={(e) => setBilledNumber(e.target.value)}
                 className="w-full mt-2 bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-black text-[15px] outline-none focus:border-[#00c853]"
