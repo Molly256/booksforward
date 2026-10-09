@@ -92,17 +92,18 @@ export default function Transactions() {
               const header = normType.charAt(0).toUpperCase() + normType.slice(1)
               const { date, time } = formatUgDateParts(tx.createdAt)
               return (
-                <div key={tx.id} className="py-5 bg-white">
-                  <p className="text-[15px] font-bold text-black">{header}</p>
-                  {normType==='withdraw' && (
-                    <p className="text-[11px] text-gray-500">Mobile: {tx.withdrawPhone || tx.phone} | Name: {tx.withdrawName}</p>
-                  )}
-                  <div className="flex justify-between items-center mt-1">
-                    <p className="text-[14px] text-black">{absAmt}shs</p>
-                    <p className={`text-[13px] lowercase font-medium ${isPending? 'text-red-500' : 'text-green-600'}`}>{tx.status}</p>
+                <div key={tx.id} className="py-5 bg-white border-b border-gray-100">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[14px] font-bold text-black">{header}</span>
+                    <span className={`text-[13px] font-medium lowercase ${isPending? 'text-red-500' : 'text-green-600'}`}>{tx.status}</span>
+                    <span className="text-[14px] font-bold text-black">{absAmt}shs</span>
                   </div>
-                  <p className="text-[13px] text-gray-600 mt-1">{date}</p>
-                  <p className="text-[13px] text-gray-600">{time}</p>
+                  <p className="text-[12px] text-gray-500 mt-2 leading-5">
+                    {date}<br/>{time}
+                  </p>
+                  {normType==='withdraw' && (
+                    <p className="text-[11px] text-gray-400 mt-1">Mobile: {tx.withdrawPhone || tx.phone} | Name: {tx.withdrawName}</p>
+                  )}
                 </div>
               )
             })

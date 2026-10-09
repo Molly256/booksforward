@@ -38,22 +38,31 @@ const Toast = ({ msg, onClose }) => {
   )
 }
 
-function VipBadge({ color, label, textColor }) {
+function VipImage({ level }) {
   return (
-    <div style={{ width: 88, height: 116, position: 'relative', flexShrink: 0 }}>
-      <svg width="88" height="88" viewBox="0 0 100 100" style={{ position: 'absolute', top: 0, left: 0 }}>
-        <path d="M50 0 L53.5 7.5 L61 2 L63 10 L71 5.5 L71 13.5 L79.5 10.5 L78 18.5 L86 17 L83 25 L90.5 25.5 L86 33 L92.5 35 L87 42 L92 46 L86 52 L90 59 L83 62 L86 70 L78 71.5 L79.5 79.5 L71 79 L71 87 L63 83 L61 91 L53.5 85.5 L50 93 L46.5 85.5 L39 91 L37 83 L29 87 L29 79 L20.5 79.5 L22 71.5 L14 70 L17 62 L10 59 L14 52 L8 46 L13 42 L7.5 35 L14 33 L9.5 25.5 L17 25 L14 17 L22 18.5 L20.5 10.5 L29 13.5 L29 5.5 L37 10 L39 2 Z" fill={color} />
-        <circle cx="50" cy="46.5" r="32" fill="white" opacity="0.18" />
-        <circle cx="50" cy="46.5" r="27" fill={color} style={{ filter: 'brightness(0.92)' }} />
-        <ellipse cx="50" cy="33" rx="14" ry="6" fill="white" opacity="0.22" />
-      </svg>
-      <div style={{ position: 'absolute', top: '25px', left: 0, width: '88px', textAlign: 'center', color: textColor, fontWeight: 900, fontSize: '15px', fontFamily: 'serif', textShadow: '0 1px 2px rgba(0,0,0,0.6)' }}>
-        {label}
-      </div>
-      <div style={{ display: 'flex', gap: '2px', marginTop: '76px', justifyContent: 'center' }}>
-        <div style={{ width: 25, height: 46, background: color, clipPath: 'polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%)', transform: 'rotate(7deg)' }}/>
-        <div style={{ width: 25, height: 46, background: color, clipPath: 'polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%)', transform: 'rotate(-7deg)' }}/>
-      </div>
+    <div style={{ 
+      width: 90, 
+      height: 110, 
+      position: 'relative', 
+      flexShrink: 0,
+      background: '#fff',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden'
+    }}>
+      <img
+        src={`/vip${level}.jpg`}
+        alt={`VIP${level}`}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          mixBlendMode: 'multiply',
+          WebkitMaskImage: 'radial-gradient(ellipse at center, black 62%, transparent 95%)',
+          maskImage: 'radial-gradient(ellipse at center, black 62%, transparent 95%)',
+        }}
+      />
     </div>
   )
 }
@@ -98,27 +107,13 @@ export default function VipLevels() {
 
   const handleBuyVip = async (vip) => {
     if (!user) return
-
     if (vip.level === 0) {
-      if (user.vipActivated) {
-        showToast('Vip0 already activated')
-        return
-      }
-      if (user.hasBoughtVip) {
-        showToast("Can't downgrade to Vip0")
-        return
-      }
+      if (user.vipActivated) { showToast('Vip0 already activated'); return }
+      if (user.hasBoughtVip) { showToast("Can't downgrade to Vip0"); return }
     } else {
-      if (vip.level <= Number(user.vip) && user.hasBoughtVip) {
-        showToast('You already have this VIP or higher')
-        return
-      }
-      if ((user.availableBalance || 0) < vip.price) {
-        showToast('Insufficient Available Balance')
-        return
-      }
+      if (vip.level <= Number(user.vip) && user.hasBoughtVip) { showToast('You already have this VIP or higher'); return }
+      if ((user.availableBalance || 0) < vip.price) { showToast('Insufficient Available Balance'); return }
     }
-
     setLoading(true)
     try {
       const dateStr = getTodayDateStrFullYear();
@@ -143,11 +138,7 @@ export default function VipLevels() {
         })
       })
       const data = await res.json()
-      if (!data.success || !data.user) {
-        showToast(data.message || 'Purchase failed')
-        setLoading(false)
-        return
-      }
+      if (!data.success || !data.user) { showToast(data.message || 'Purchase failed'); setLoading(false); return }
       const updatedUser = { ...data.user }
       localStorage.setItem('booksforward_user', JSON.stringify(updatedUser))
       setUser(updatedUser)
@@ -165,6 +156,11 @@ export default function VipLevels() {
   const thStyle = { padding: '8px 3px', fontSize: '9.5px', fontWeight: '600', background: HOT_GREEN, border: '1px solid #000', color: '#000', textAlign: 'center' }
   const tdStyle = { padding: '7px 3px', fontSize: '9.5px', fontWeight: '400', border: '1px solid #000', color: '#000', textAlign: 'center', background: '#fff' }
 
+  // Salary table styles (exact 1:1 from your image)
+  const salaryTh = { padding: '12px 6px', fontSize: '11px', fontWeight: '700', background: '#00C853', color: '#fff', textAlign: 'center', border: '1px solid #ddd' }
+  const salaryTd = { padding: '10px 6px', fontSize: '11px', fontWeight: '500', color: '#000', textAlign: 'center', border: '1px solid #ddd' }
+  const salaryTdGray = { ...salaryTd, background: '#f2f2f2' }
+
   return (
     <main style={{ minHeight: '100vh', background: '#FFFFFF', padding: '0', paddingBottom: '90px' }}>
       {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
@@ -178,7 +174,7 @@ export default function VipLevels() {
         <h2 style={{ fontSize: '13px', fontWeight: '900', color: '#000', margin: '12px 0 4px' }}>INCOME TABLE</h2>
         <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>6 days / 4 weeks / 12 months</p>
 
-        <div style={{ width: '100%', overflowX: 'auto', marginBottom: '28px' }}>
+        <div style={{ width: '100%', overflowX: 'auto', marginBottom: '24px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -216,6 +212,49 @@ export default function VipLevels() {
           </table>
         </div>
 
+        {/* SALARY TABLE 1:1 EXACT FROM YOUR IMAGE */}
+        <div style={{ width: '100%', overflowX: 'auto', marginBottom: '20px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={salaryTh}>POSITION</th>
+                <th style={salaryTh}>NUMBER OF MEMBERS</th>
+                <th style={salaryTh}>TEAM COUNT</th>
+                <th style={salaryTh}>SALARY</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style={salaryTd}>Trainee</td><td style={salaryTd}>8</td><td style={salaryTd}>ABC</td><td style={{...salaryTd, fontWeight: '700'}}>90,000shs</td></tr>
+              <tr><td style={salaryTdGray}>Team Trainee</td><td style={salaryTdGray}>16</td><td style={salaryTdGray}>ABC</td><td style={{...salaryTdGray, fontWeight: '700'}}>170,000shs</td></tr>
+              <tr><td style={salaryTd}>Team Leader</td><td style={salaryTd}>25</td><td style={salaryTd}>ABC</td><td style={{...salaryTd, fontWeight: '700'}}>260,000shs</td></tr>
+              <tr><td style={salaryTdGray}>Team Manager</td><td style={salaryTdGray}>40</td><td style={salaryTdGray}>ABC</td><td style={{...salaryTdGray, fontWeight: '700'}}>420,000shs</td></tr>
+              <tr><td style={salaryTd}>Regional Supervisor</td><td style={salaryTd}>80</td><td style={salaryTd}>ABC</td><td style={{...salaryTd, fontWeight: '700'}}>820,000shs</td></tr>
+              <tr><td style={salaryTdGray}>Manager</td><td style={salaryTdGray}>150</td><td style={salaryTdGray}>ABC</td><td style={{...salaryTdGray, fontWeight: '700'}}>1,600,000shs</td></tr>
+              <tr><td style={salaryTd}>General Manager</td><td style={salaryTd}>400</td><td style={salaryTd}>ABC</td><td style={{...salaryTd, fontWeight: '700'}}>4,200,000shs</td></tr>
+              <tr><td style={salaryTdGray}>Marketing Manager</td><td style={salaryTdGray}>600</td><td style={salaryTdGray}>ABC</td><td style={{...salaryTdGray, fontWeight: '700'}}>6,200,000shs</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ padding: '0 4px', marginBottom: '28px' }}>
+          <p style={{ fontSize: '13px', fontWeight: '800', color: '#00C853', marginBottom: '6px' }}>SALARY QUALIFICATION GUIDELINES</p>
+          <p style={{ fontSize: '11px', color: '#000', lineHeight: '1.5', marginBottom: '8px' }}>
+            To qualify for the salary attached to each position, you must maintain a well-balanced ABC team.
+          </p>
+          <p style={{ fontSize: '11px', fontWeight: '700', color: '#000', marginBottom: '4px' }}>Requirement:</p>
+          <ul style={{ margin: '0 0 10px 16px', padding: 0 }}>
+            <li style={{ fontSize: '11px', color: '#000', lineHeight: '1.6', listStyle: 'disc' }}>40% of members must be on your current VIP level</li>
+            <li style={{ fontSize: '11px', color: '#000', lineHeight: '1.6', listStyle: 'disc' }}>60% of members must be on any VIP level above your current VIP level</li>
+          </ul>
+          <p style={{ fontSize: '11px', fontWeight: '700', color: '#00C853', marginBottom: '4px' }}>Payment Schedule:</p>
+          <p style={{ fontSize: '11px', color: '#000', lineHeight: '1.5', marginBottom: '8px' }}>
+            All qualified salaries are paid on the <span style={{ color: '#00C853', fontWeight: '800' }}>15th</span> of each month.
+          </p>
+          <p style={{ fontSize: '11px', color: '#000', lineHeight: '1.5' }}>
+            If you meet these requirements, please contact the Hiring Manager to be registered on the company's monthly payroll.
+          </p>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '420px', margin: '0 auto' }}>
           {vips.map(vip => {
             const isCurrent = currentVipLevel === vip.level && (vip.level===0 ? user.vipActivated : true)
@@ -229,7 +268,6 @@ export default function VipLevels() {
                 canBuy = vip.level > currentVipLevel
               }
             }
-
             return (
               <div key={vip.level} style={{
                 background: '#fff',
@@ -240,7 +278,7 @@ export default function VipLevels() {
                 alignItems: 'center',
                 boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
               }}>
-                <VipBadge color={vip.color} label={`VIP${vip.level}`} textColor={vip.textColor} />
+                <VipImage level={vip.level} />
                 <div style={{ marginLeft: '16px', flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <span style={{ fontWeight: 900, fontSize: '16px', color: '#111' }}>{vip.name}</span>

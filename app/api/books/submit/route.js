@@ -16,45 +16,27 @@ export const VIPS = {
 function getUgandaDateString() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' });
 }
-
-// NEW: Uganda DateTime YYYY-MM-DD-HH-mm-ss
 function getUgandaDateTime() {
   const now = new Date();
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Africa/Kampala',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   }).formatToParts(now);
-  const m = {};
-  parts.forEach(p => m[p.type] = p.value);
+  const m = {}; parts.forEach(p => m[p.type] = p.value);
   return `${m.year}-${m.month}-${m.day}-${m.hour}-${m.minute}-${m.second}`;
 }
-
-function makeId() {
-  // Unique but readable: 2026-05-13-16-30-45-abc12
-  return `${getUgandaDateTime()}-${Math.random().toString(36).slice(2,7)}`;
-}
-
+function makeId() { return `${getUgandaDateTime()}-${Math.random().toString(36).slice(2,7)}`; }
 function safeParse(str, fallback = []) {
   if (!str) return fallback;
-  try { 
-    const parsed = JSON.parse(str);
-    return Array.isArray(parsed) ? parsed : fallback;
-  } catch { 
-    return fallback; 
-  }
+  try { const parsed = JSON.parse(str); return Array.isArray(parsed)? parsed : fallback; } catch { return fallback; }
 }
 
 export async function POST(request) {
   try {
-    const { phone, bookId, action } = await request.json();
+    const { phone, bookId, action, bookTitle: realTitleFromFront } = await request.json();
 
-    if (!phone || !bookId || !action) {
+    if (!phone ||!bookId ||!action) {
       return NextResponse.json({ error: 'Missing phone, bookId, or action' }, { status: 400 });
     }
 
@@ -63,60 +45,57 @@ export async function POST(request) {
     const userKey = `bf:user:${phone}`;
     const txKey = `bf:tx:${phone}:${today}`;
     const historyKey = `bf:tx:${phone}:history`;
-    const incomeKey = `bf:income:${phone}:${today}`; 
+    const incomeKey = `bf:income:${phone}:${today}`;
 
     const userData = await redis.hgetall(userKey);
-    if (!userData || !userData.phone) {
+    if (!userData ||!userData.phone) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     if (action === 'read') {
       const currentStatus = await redis.hget(bookKey, 'status') || null;
-      if (currentStatus === 'submitted') {
-        return NextResponse.json({ success: true, status: 'submitted' });
-      }
-      await redis.hset(bookKey, {
-        status: 'read',
-        readAt: new Date().toISOString()
-      });
+      if (currentStatus === 'submitted') return NextResponse.json({ success: true, status: 'submitted' });
+      await redis.hset(bookKey, { status: 'read', readAt: new Date().toISOString() });
       return NextResponse.json({ success: true, status: 'read' });
     }
 
     if (action === 'submit') {
       const currentStatus = await redis.hget(bookKey, 'status') || null;
       if (currentStatus === 'submitted') {
-        const currentBal = Number(userData.availableBalance || 0);
-        return NextResponse.json({ success: true, availableBalance: currentBal, status: 'submitted' });
+        return NextResponse.json({ success: true, availableBalance: Number(userData.availableBalance||0), status: 'submitted' });
       }
-      if (currentStatus !== 'read') {
+      if (currentStatus!== 'read') {
         return NextResponse.json({ error: 'Book must be read before submitting' }, { status: 400 });
       }
 
       const vipLevel = Number(userData.vip || 0);
       const vipData = VIPS[vipLevel];
-      if (!vipData) {
-        return NextResponse.json({ error: 'VIP level configuration not open' }, { status: 403 });
-      }
+      if (!vipData) return NextResponse.json({ error: 'VIP level configuration not open' }, { status: 403 });
 
       const payout = vipData.perBook;
       const currentCompleted = safeParse(userData.completedBooks);
-      if (!currentCompleted.includes(String(bookId))) {
-        currentCompleted.push(String(bookId));
+      if (!currentCompleted.includes(String(bookId))) currentCompleted.push(String(bookId));
+
+      // GET REAL BOOK TITLE from bookKey or frontend
+      let finalTitle = realTitleFromFront;
+      if (!finalTitle) {
+        const bookInfo = await redis.hgetall(bookKey);
+        finalTitle = bookInfo?.title || bookInfo?.bookTitle || `Book ${bookId}`;
       }
 
-      // FIXED: Now uses Uganda DateTime, not long number
       const ugDateTime = getUgandaDateTime();
-      
+
       const tx = {
-        id: makeId(), // unique: 2026-05-13-16-30-45-abc12
-        type: 'daily income', // shows DAILY INCOME directly
+        id: makeId(),
+        type: 'daily income', // ONLY daily income goes to task history
         label: 'Daily Income',
         amount: String(payout),
-        status: 'Success', // shows Success like screenshot
-        createdAt: ugDateTime, // 2026-05-13-16-30-45 - Uganda time!
+        status: 'Success',
+        createdAt: ugDateTime,
         phone: phone,
         vipLevel: String(vipLevel),
-        bookTitle: `Book ${bookId}`,
+        bookTitle: finalTitle, // REAL TITLE NOW!
+        title: finalTitle,
         bookId: String(bookId)
       };
 
@@ -133,12 +112,9 @@ export async function POST(request) {
       });
 
       const txString = JSON.stringify(tx);
-      // KEEP ALL HISTORY - never expires
-      await redis.lpush(txKey, txString); 
-      await redis.lpush(historyKey, txString); // permanent history
-      await redis.lpush(incomeKey, txString); 
-
-      // Ensure history key never expires (safety)
+      await redis.lpush(txKey, txString);
+      await redis.lpush(historyKey, txString);
+      await redis.lpush(incomeKey, txString);
       await redis.persist(historyKey);
 
       return NextResponse.json({
@@ -151,7 +127,6 @@ export async function POST(request) {
     }
 
     return NextResponse.json({ error: 'Invalid action specified' }, { status: 400 })
-
   } catch (error) {
     console.error('API /books/submit Error:', error)
     return NextResponse.json({ error: 'Internal system failure' }, { status: 500 })

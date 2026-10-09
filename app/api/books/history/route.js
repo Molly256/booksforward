@@ -11,32 +11,29 @@ export async function GET(request) {
     const phone = searchParams.get('phone');
     if (!phone) return NextResponse.json({ success: true, history: [] });
 
-    // 1. permanent history
     const historyKey = `bf:tx:${phone}:history`;
-    const permanent = await redis.lrange(historyKey, 0, 200);
+    const list = await redis.lrange(historyKey, 0, 500);
 
-    // 2. also check today's tx (for old data before fix)
-    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' });
-    const todayKey = `bf:tx:${phone}:${today}`;
-    const todayList = await redis.lrange(todayKey, 0, 200);
-
-    // Merge & deduplicate by id
-    const allRaw = [...permanent, ...todayList];
-    const seen = new Set();
     const history = [];
+    const seen = new Set();
 
-    for (const str of allRaw) {
+    for (const str of list) {
       try {
-        const tx = typeof str === 'string' ? JSON.parse(str) : str;
-        const uniq = tx.id || `${tx.bookId}-${tx.createdAt}`;
+        const tx = JSON.parse(str);
+
+        // === TASK HISTORY FILTER - ONLY DAILY INCOME TAB ===
+        if (tx.type !== 'daily income') continue; // hide deposit 50000, withdraw, vip purchase
+        if (!tx.bookId || tx.bookId === 'undefined' || tx.bookId === '') continue; // hide Book undefined
+
+        const uniq = `${tx.bookId}-${tx.createdAt}`;
         if (seen.has(uniq)) continue;
         seen.add(uniq);
+
         history.push({
-          id: tx.bookId || tx.id,
+          id: tx.bookId,
           bookId: tx.bookId,
-          title: tx.bookTitle || `Book ${tx.bookId}`,
+          title: tx.bookTitle || tx.title || `Book ${tx.bookId}`, // real title
           earned: Number(tx.amount || 0),
-          reward: Number(tx.amount || 0),
           cover: `/books/covers/${tx.bookId}.jpg`,
           completedAt: tx.createdAt,
           status: 'submitted'
@@ -44,7 +41,6 @@ export async function GET(request) {
       } catch {}
     }
 
-    // Sort newest first
     history.sort((a,b) => (b.completedAt||'').localeCompare(a.completedAt||''));
 
     return NextResponse.json({ success: true, history }, {
