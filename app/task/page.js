@@ -1,6 +1,5 @@
 'use client'
 export const dynamic = 'force-dynamic';
-
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 
@@ -29,63 +28,90 @@ export default function TaskPage() {
       })
       const dataJson = await res.json()
       if (dataJson.success) {
-        const mergedBooks = dataJson.books.map(function(b) {
-          return Object.assign({}, b, {
-            cover: '/books/covers/' + b.bookId + '.jpg',
-          })
-        })
+        const mergedBooks = dataJson.books.map(b => ({
+          ...b,
+          cover: '/books/covers/' + b.bookId + '.jpg',
+        }))
         setBooks(mergedBooks)
       }
+      // HISTORY - MERGE SERVER + LOCAL, DON'T OVERWRITE
       const histRes = await fetch(`/api/books/history?phone=${phone}&_t=${Date.now()}`, { cache: 'no-store' })
       const histJson = await histRes.json()
-      if(histJson.success) setHistory(histJson.history || [])
+      const serverHistory = histJson.success ? (histJson.history || []) : []
+      
+      // Load local history
+      const localHistory = JSON.parse(localStorage.getItem(`task_history_${phone}`) || '[]')
+      
+      // Merge and dedupe by bookId
+      const merged = [...serverHistory, ...localHistory]
+      const unique = []
+      const seen = new Set()
+      for (const h of merged) {
+        const id = String(h.bookId || h.id)
+        if (!seen.has(id)) {
+          seen.add(id)
+          unique.push(h)
+        }
+      }
+      // Sort newest first
+      unique.sort((a,b) => new Date(b.completedAt) - new Date(a.completedAt))
+      
+      setHistory(unique)
+      // Save merged back to local
+      if (unique.length > 0) {
+        localStorage.setItem(`task_history_${phone}`, JSON.stringify(unique))
+      }
     } catch (err) {
       console.error('Fetch error:', err)
+      // Fallback to local on error
+      const phone = JSON.parse(localStorage.getItem('booksforward_user') || '{}').phone
+      if (phone) {
+        const localHistory = JSON.parse(localStorage.getItem(`task_history_${phone}`) || '[]')
+        setHistory(localHistory)
+      }
     }
   }
 
-  useEffect(function() {
+  useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('booksforward_user') || '{}')
     if (!userData.phone) return
     setUser(userData)
+    // Load local history instantly before fetch
+    const localHistory = JSON.parse(localStorage.getItem(`task_history_${userData.phone}`) || '[]')
+    if (localHistory.length > 0) setHistory(localHistory)
+    
     fetchBooks(userData.phone)
   }, [])
 
-  useEffect(function(){
+  useEffect(() => {
     if(!readingBook) return
-    if(timer <= 0){
-      setFinished(true)
-      return
-    }
+    if(timer <= 0){ setFinished(true); return }
     const id = setInterval(()=>{
       setJump(true)
       setTimeout(()=> setJump(false), 180)
       setTimer(t=> t-1)
     },1000)
     return ()=> clearInterval(id)
-  },[readingBook][timer])
+  },[readingBook, timer])
 
   const showToastMsg = (msg) => {
     setToast(msg)
     setTimeout(()=> setToast(''), 2500)
   }
 
-  const handleRead = function(book) {
+  const handleRead = (book) => {
     const currentlyReading = localStorage.getItem('currentlyReading')
     const completedRead = JSON.parse(localStorage.getItem('completedRead') || '[]')
-    if (currentlyReading && currentlyReading!== String(book.bookId)) {
-      showToastMsg('still have a pending reading')
-      return
+    if (currentlyReading && currentlyReading !== String(book.bookId)) {
+      showToastMsg('still have a pending reading'); return
     }
-    if (completedRead.length > 0 &&!completedRead.includes(String(book.bookId))) {
-      showToastMsg('still have a pending submission')
-      return
+    if (completedRead.length > 0 && !completedRead.includes(String(book.bookId))) {
+      showToastMsg('still have a pending submission'); return
     }
-    if (completedRead.length > 0 && completedRead.includes(String(book.bookId))) {
-      showToastMsg('still have a pending submission')
-      return
+    if (completedRead.includes(String(book.bookId))) {
+      showToastMsg('still have a pending submission'); return
     }
-    if (book.status!== 'pending') return
+    if (book.status !== 'pending') return
     localStorage.setItem('currentlyReading', String(book.bookId))
     setReadingBook(book)
     setTimer(15)
@@ -112,15 +138,16 @@ export default function TaskPage() {
     setBooks(prev=> prev.map(b=> b.bookId === readingBook.bookId? {...b, status:'read'} : b))
   }
 
-  // FIXED: SEND TITLE + REWARD SO HISTORY GETS EXACT COVER/TITLE/EARNED
-  const handleSubmit = async function(book) {
+  const handleSubmit = async (book) => {
     const completedRead = JSON.parse(localStorage.getItem('completedRead') || '[]')
-    if (!completedRead.includes(String(book.bookId)) && book.status!== 'read') {
+    if (!completedRead.includes(String(book.bookId)) && book.status !== 'read') {
       return showToastMsg('Finish reading first')
     }
     if (lockRef.current.has('s-' + book.bookId)) return
     lockRef.current.add('s-' + book.bookId)
+    
     setBooks(prev=> prev.map(b=> b.bookId === book.bookId? {...b, status:'submitted'} : b))
+    
     try {
       const res = await fetch('/api/books/submit', {
         method: 'POST',
@@ -128,32 +155,40 @@ export default function TaskPage() {
         body: JSON.stringify({
           phone: user.phone,
           bookId: book.bookId,
-          bookTitle: book.title, // FIX: send real title from data.js
+          bookTitle: book.title,
           action: 'submit'
         })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Submit failed')
-      const newUser = Object.assign({}, user, { availableBalance: data.availableBalance })
+      
+      const newUser = { ...user, availableBalance: data.availableBalance }
       setUser(newUser)
       localStorage.setItem('booksforward_user', JSON.stringify(newUser))
-      const newCompleted = completedRead.filter(id=> String(id)!== String(book.bookId))
+      const newCompleted = completedRead.filter(id=> String(id) !== String(book.bookId))
       localStorage.setItem('completedRead', JSON.stringify(newCompleted))
       localStorage.removeItem('currentlyReading')
 
-      // FIX: INSTANT REFLECT - fetch history immediately after submit
-      await fetchBooks(user.phone)
-
-      // Also optimistically push to history for instant UI
+      // FIX: CREATE HISTORY ITEM AND SAVE LOCALLY FIRST
       const newHistoryItem = {
         id: book.bookId,
         bookId: book.bookId,
         title: book.title,
-        earned: Number(book.reward || data.availableBalance - (user.availableBalance||0) || 0),
+        earned: Number(book.reward || 0),
         cover: '/books/covers/' + book.bookId + '.jpg',
         completedAt: new Date().toLocaleString("en-CA", { timeZone: "Africa/Kampala" })
       }
-      setHistory(prev => [newHistoryItem,...prev])
+      
+      // Update localStorage history - APPEND not replace
+      const existingLocal = JSON.parse(localStorage.getItem(`task_history_${user.phone}`) || '[]')
+      // Remove if already exists to avoid duplicate
+      const filtered = existingLocal.filter(h => String(h.bookId) !== String(book.bookId))
+      const updatedLocal = [newHistoryItem, ...filtered]
+      localStorage.setItem(`task_history_${user.phone}`, JSON.stringify(updatedLocal))
+      setHistory(updatedLocal)
+
+      // Then sync with server
+      await fetchBooks(user.phone)
 
     } catch(err) {
       showToastMsg(err.message || 'Submit failed')
@@ -211,12 +246,10 @@ export default function TaskPage() {
       {toast && (
         <div style={{ position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)', background: HOT_GREEN, color: '#fff', padding: '10px 20px', borderRadius: 20, fontWeight: 900, fontSize: 13, zIndex: 9999, boxShadow: '0px 4px 10px rgba(0,0,0,0.2)' }}>{toast}</div>
       )}
-
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#000' }}>Tasks</h2>
         <button onClick={()=>setShowHistory(true)} style={{ border: '2px solid black', borderRadius: 20, padding: '6px 16px', fontWeight: 600, fontSize: 13, background: HOT_GREEN, color: '#000', boxShadow: '2px 2px 0px black' }}>Tasks history</button>
       </div>
-
       {pendingBooks.length === 0? (
         <div style={{ textAlign: 'center', marginTop: 80, color: '#000' }}>
           <p style={{ fontSize: '16px', fontWeight: '700' }}>No tasks available now</p>
@@ -225,28 +258,25 @@ export default function TaskPage() {
           )}
         </div>
       ) : (
-        <>
-          <div style={{ display: 'grid', gap: '20px' }}>
-            {pendingBooks.map(function(book) {
-              const isRead = completedReadLS.includes(String(book.bookId)) || book.status === 'read'
-              return (
-                <div key={book.bookId} style={{ background: '#fff', border: '2px solid black', borderRadius: '12px', padding: '12px', display: 'flex', gap: '15px', alignItems: 'center', boxShadow: '3px 3px 0px black' }}>
-                  <img src={book.cover} alt={book.title} style={{ width: 80, height: 110, objectFit: 'cover', borderRadius: 8, border: '1px solid #ddd' }} />
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '900', color: '#000' }}>{book.title}</h3>
-                    <p style={{ margin: '4px 0 10px', fontSize: '11px', color: '#666' }}>Reward: UGX {book.reward}</p>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button onClick={()=> handleRead(book)} style={{ flex: 1, padding: '8px', borderRadius: '20px', border: '2px solid black', background: isRead? LIGHT_GREEN : HOT_GREEN, color: isRead? '#999' : '#fff', fontWeight: '900', fontSize: 12 }}>{isRead? 'Read ✓' : 'Read'}</button>
-                      <button onClick={()=> handleSubmit(book)} disabled={!isRead} style={{ flex: 1, padding: '8px', borderRadius: '20px', border: '2px solid black', background: isRead? HOT_GREEN : LIGHT_GREEN, color: isRead? '#fff' : '#aaa', fontWeight: '900', fontSize: 12, cursor:!isRead? 'not-allowed' : 'pointer' }}>Submit</button>
-                    </div>
+        <div style={{ display: 'grid', gap: '20px' }}>
+          {pendingBooks.map(book => {
+            const isRead = completedReadLS.includes(String(book.bookId)) || book.status === 'read'
+            return (
+              <div key={book.bookId} style={{ background: '#fff', border: '2px solid black', borderRadius: '12px', padding: '12px', display: 'flex', gap: '15px', alignItems: 'center', boxShadow: '3px 3px 0px black' }}>
+                <img src={book.cover} alt={book.title} style={{ width: 80, height: 110, objectFit: 'cover', borderRadius: 8, border: '1px solid #ddd' }} />
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '900', color: '#000' }}>{book.title}</h3>
+                  <p style={{ margin: '4px 0 10px', fontSize: '11px', color: '#666' }}>Reward: UGX {book.reward}</p>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button onClick={()=> handleRead(book)} style={{ flex: 1, padding: '8px', borderRadius: '20px', border: '2px solid black', background: isRead? LIGHT_GREEN : HOT_GREEN, color: isRead? '#999' : '#fff', fontWeight: '900', fontSize: 12 }}>{isRead? 'Read ✓' : 'Read'}</button>
+                    <button onClick={()=> handleSubmit(book)} disabled={!isRead} style={{ flex: 1, padding: '8px', borderRadius: '20px', border: '2px solid black', background: isRead? HOT_GREEN : LIGHT_GREEN, color: isRead? '#fff' : '#aaa', fontWeight: '900', fontSize: 12, cursor:!isRead? 'not-allowed' : 'pointer' }}>Submit</button>
                   </div>
                 </div>
-              )
-            })}
-          </div>
-        </>
+              </div>
+            )
+          })}
+        </div>
       )}
-
       {showHistory && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 50, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ background: 'white', width: '90%', maxWidth: 380, height: '100%', padding: 16, overflowY: 'auto' }}>
@@ -256,7 +286,7 @@ export default function TaskPage() {
             </div>
             {history.length === 0 && <p style={{ color: '#999' }}>No history</p>}
             {history.map((h,i)=>(
-              <div key={i} style={{ display: 'flex', gap: 12, borderBottom: '1px solid #eee', padding: '12px 0', alignItems:'center' }}>
+              <div key={`${h.bookId}-${i}`} style={{ display: 'flex', gap: 12, borderBottom: '1px solid #eee', padding: '12px 0', alignItems:'center' }}>
                 <img src={h.cover || '/books/covers/' + (h.bookId || h.id) + '.jpg'} style={{ width: 56, height: 80, objectFit: 'cover', borderRadius: 6, border:'1px solid #eee' }} alt={h.title} />
                 <div style={{ flex: 1 }}>
                   <p style={{ fontWeight: 900, fontSize: 12, lineHeight:'1.2' }}>{h.title}</p>
