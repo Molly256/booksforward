@@ -69,7 +69,7 @@ export default function Register() {
       return
     }
     if (!form.inviterCode || !/^\d{6}BF$/.test(form.inviterCode)) {
-      showToast('Valid invite code required - e.g. 185973BF')
+      showToast('Invite code required')
       lockRef.current = false
       return
     }

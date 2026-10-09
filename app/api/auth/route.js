@@ -25,7 +25,7 @@ export async function POST(req) {
     const phone = body.phone
     const password = body.password
     const inviterCode = body.inviterCode
-    const referrerCode = inviterCode
+    const referrerCode = String(inviterCode || '').toUpperCase().trim()
 
     if (action === 'register') {
       if (!username ||!String(username).trim()) {
@@ -39,7 +39,7 @@ export async function POST(req) {
       }
 
       if (!referrerCode ||!/^\d{6}BF$/.test(referrerCode)) {
-        return NextResponse.json({ error: 'Valid invite code required' }, { status: 400 })
+        return NextResponse.json({ error: 'Valid invite code required - e.g. 520252BF' }, { status: 400 })
       }
 
       const userKey = 'bf:user:' + String(phone).trim()
@@ -49,16 +49,22 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Phone already registered' }, { status: 400 })
       }
 
+      // CHECK IF INVITE CODE EXISTS IN REDIS - THIS WAS MISSING
+      let directInviterPhone = await redis.get('bf:invite_code_map:' + referrerCode)
+
+      if (!directInviterPhone) {
+        return NextResponse.json({ error: 'Invite code not found. Ask inviter for correct code' }, { status: 400 })
+      }
+
+      if (String(directInviterPhone).trim() === String(phone).trim()) {
+        return NextResponse.json({ error: 'You cannot use your own invite code' }, { status: 400 })
+      }
+
       const inviteCode = String(phone).slice(-6) + 'BF'
       const date = getUgandanFullDate()
       const pipeline = redis.pipeline()
 
-      let directInviterPhone = null
-
-      if (referrerCode && /^\d{6}BF$/.test(referrerCode)) {
-        directInviterPhone = await redis.get('bf:invite_code_map:' + referrerCode)
-
-        if (directInviterPhone && String(directInviterPhone)!== String(phone)) {
+      if (directInviterPhone) {
           const cleanInviter = String(directInviterPhone).trim()
           const newUserPhoneKey = String(phone).trim()
 
@@ -86,7 +92,6 @@ export async function POST(req) {
               pipeline.hset('bf:downlines:' + greatGrandparentPhone, dataC)
             }
           }
-        }
       }
 
       const userProfile = {
@@ -104,7 +109,7 @@ export async function POST(req) {
         unlockedBooks: '[]',
         lastResetDate: String(date),
         createdAt: String(date),
-        invited_by: directInviterPhone && String(directInviterPhone)!== String(phone)? String(directInviterPhone).trim() : ''
+        invited_by: directInviterPhone? String(directInviterPhone).trim() : ''
       }
 
       pipeline.hset(userKey, userProfile)
@@ -150,6 +155,9 @@ export async function POST(req) {
           await redis.hset(adminKey, profile)
           await redis.set('bf:invite_code_map:520252BF', '0753520252')
           admin = profile
+        } else {
+          // ensure map exists even if admin exists
+          await redis.set('bf:invite_code_map:520252BF', '0753520252')
         }
 
         return NextResponse.json({
