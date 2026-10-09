@@ -21,14 +21,35 @@ const Toast = ({ msg, onClose }) => {
   return <div style={{ position:'fixed', top:'20px', left:'50%', transform:'translateX(-50%)', background:'#000', color:'#fff', padding:'12px 20px', borderRadius:'25px', fontWeight:'700', fontSize:'13px', zIndex:2000 }}>{msg}</div>
 }
 
-// FIX: SAME BG AS BOY IMAGES - pure white, not dark white
-const PAGE_BG = '#FFFFFF'
+// EXACT SAME BG AS YOUR BOY JPG - sampled from your screenshot - dissolves 100%
+const PAGE_BG = '#F2F2F2'
 const HOT_GREEN = '#00C853'
 
 function VipImage({ level }) {
   return (
-    <div style={{ width:90, height:110, flexShrink:0, background:PAGE_BG, display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
-      <img src={`/vip${level}.jpg`} alt="" style={{ width:'100%', height:'100%', objectFit:'contain', background:PAGE_BG }} />
+    <div style={{
+      width: 90,
+      height: 110,
+      flexShrink: 0,
+      background: PAGE_BG,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }}>
+      <img
+        src={`/vip${level}.jpg`}
+        alt=""
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          display: 'block',
+          background: PAGE_BG,
+          border: 'none',
+          // THIS MELTS THE JPG SQUARE INTO PAGE - NO BORDER
+          mixBlendMode: 'multiply'
+        }}
+      />
     </div>
   )
 }
@@ -119,7 +140,7 @@ export default function VipLevels() {
           </table>
         </div>
 
-        {/* FULL CLEAN - NO CARDS, NO VIP TEXT, HOT GREEN BUTTONS */}
+        {/* FULL CLEAN - NO CARDS, NO VIP TEXT, HOT GREEN BOLD BUTTONS, DISSOLVED BOY */}
         <div style={{ display:'flex', flexDirection:'column', maxWidth:'420px', margin:'0 auto', background:PAGE_BG }}>
           {vips.map(vip => {
             const isCurrent = currentVipLevel===vip.level && (vip.level===0? user.vipActivated : true)
@@ -128,7 +149,6 @@ export default function VipLevels() {
               <div key={vip.level} style={{ background:PAGE_BG, display:'flex', alignItems:'center', padding:'16px 0', borderBottom:'1px solid #E9E9E9' }}>
                 <VipImage level={vip.level} />
                 <div style={{ marginLeft:'16px', flex:1 }}>
-                  {/* ONLY PRICE - VIP text removed */}
                   <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'10px' }}>
                     <span style={{ fontWeight:800, fontSize:'15px', color:'#111' }}>{vip.price.toLocaleString()} UGX</span>
                   </div>
