@@ -28,8 +28,8 @@ export async function POST(req) {
     const referrerCode = inviterCode
 
     if (action === 'register') {
-      if (!/^[a-zA-Z0-9]{6}$/.test(username)) {
-        return NextResponse.json({ error: 'Username must be 6 alphanumeric chars' }, { status: 400 })
+      if (!username ||!String(username).trim()) {
+        return NextResponse.json({ error: 'Username is required' }, { status: 400 })
       }
       if (!/^07\d{8}$/.test(phone)) {
         return NextResponse.json({ error: 'Phone must be 07XXXXXXXX' }, { status: 400 })
@@ -96,8 +96,8 @@ export async function POST(req) {
         inviteCode: String(inviteCode),
         availableBalance: '0',
         vip: '0',
-        hasBoughtVip: 'false', // ADDED for Vip0 logic
-        vipActivated: 'false', // ADDED for Vip0 logic
+        hasBoughtVip: 'false',
+        vipActivated: 'false',
         books_read_today: '0',
         dailyIncome: '0',
         completedBooks: '[]',

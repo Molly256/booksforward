@@ -20,7 +20,6 @@ export default function Register() {
   const [showRepeatPassword, setShowRepeatPassword] = useState(false)
   const [isLocked, setIsLocked] = useState(false)
 
-  // BLACK TOAST FUNCTION
   const showToast = (message, type = 'error') => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 3000)
@@ -49,8 +48,8 @@ export default function Register() {
     if (lockRef.current) return
     lockRef.current = true
 
-    if (!/^[a-zA-Z0-9]{6}$/.test(form.username)) {
-      showToast('Username must be 6 letters and numbers combined')
+    if (!form.username.trim()) {
+      showToast('Username is required')
       lockRef.current = false
       return
     }
@@ -141,7 +140,6 @@ export default function Register() {
   return (
     <div style={{ minHeight: '100vh', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative' }}>
       
-      {/* BLACK TOAST */}
       {toast && (
         <div style={{
           position: 'fixed',
@@ -171,15 +169,12 @@ export default function Register() {
           
           <div>
             <label style={{ fontSize: '15px', color: '#000', display: 'block', marginBottom: '6px', fontWeight: '700' }}>Username</label>
-            <input type="text" placeholder="6 letters/numbers" value={form.username} onChange={(e) => setForm(prev => ({ ...prev, username: e.target.value }))} maxLength={6} style={inputStyle} required />
+            <input type="text" placeholder="Enter username" value={form.username} onChange={(e) => setForm(prev => ({ ...prev, username: e.target.value }))} style={inputStyle} required />
           </div>
 
           <div>
             <label style={{ fontSize: '15px', color: '#000', display: 'block', marginBottom: '6px', fontWeight: '700' }}>Phone Number</label>
             <input type="tel" placeholder="07XXXXXXXX" value={form.phone} onChange={(e) => handlePhoneChange(e.target.value)} maxLength={10} style={inputStyle} required />
-            {form.phone.length === 10 && (
-              <p style={{fontSize:'12px', color:'#666', marginTop:'4px'}}>Your code will be: <b>{form.phone.slice(-6)}BF</b></p>
-            )}
           </div>
 
           <div>
@@ -205,9 +200,12 @@ export default function Register() {
             <input
               type="text"
               value={form.inviterCode}
-              readOnly
+              onChange={(e) => {
+                setForm(prev => ({ ...prev, inviterCode: e.target.value }))
+                if(isLocked) setIsLocked(false)
+              }}
               placeholder="No inviter"
-              style={{...inputStyle, backgroundColor: isLocked ? '#E8F5E9' : '#f9fafb', color: '#000', fontWeight: isLocked ? '900' : '400'}}
+              style={{...inputStyle, backgroundColor: '#FFFFFF', color: '#000'}}
             />
           </div>
 
