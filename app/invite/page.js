@@ -8,7 +8,7 @@ export default function InvitePage() {
   const [toast, setToast] = useState(null)
 
   const HOT_GREEN = '#00c853'
-  const BASE_URL = 'https://booksforward.vercel.app'
+  const BASE_URL = 'https://booksforward.us.com'
 
   const showToast = (msg, type = 'error') => {
     setToast({ msg, type })
