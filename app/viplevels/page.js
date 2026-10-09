@@ -21,7 +21,6 @@ const Toast = ({ msg, onClose }) => {
   return <div style={{ position:'fixed', top:'20px', left:'50%', transform:'translateX(-50%)', background:'#000', color:'#fff', padding:'12px 20px', borderRadius:'25px', fontWeight:'700', fontSize:'13px', zIndex:2000 }}>{msg}</div>
 }
 
-// EXACT SAME BG AS YOUR BOY JPG - sampled from your screenshot - dissolves 100%
 const PAGE_BG = '#F2F2F2'
 const HOT_GREEN = '#00C853'
 
@@ -46,7 +45,6 @@ function VipImage({ level }) {
           display: 'block',
           background: PAGE_BG,
           border: 'none',
-          // THIS MELTS THE JPG SQUARE INTO PAGE - NO BORDER
           mixBlendMode: 'multiply'
         }}
       />
@@ -124,7 +122,7 @@ export default function VipLevels() {
           </table>
         </div>
 
-        <div style={{ width:'100%', overflowX:'auto', marginBottom:'20px' }}>
+        <div style={{ width:'100%', overflowX:'auto', marginBottom:'16px' }}>
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
             <thead><tr><th style={salaryTh}>POSITION</th><th style={salaryTh}>NUMBER OF MEMBERS</th><th style={salaryTh}>TEAM COUNT</th><th style={salaryTh}>SALARY</th></tr></thead>
             <tbody>
@@ -140,7 +138,26 @@ export default function VipLevels() {
           </table>
         </div>
 
-        {/* FULL CLEAN - NO CARDS, NO VIP TEXT, HOT GREEN BOLD BUTTONS, DISSOLVED BOY */}
+        {/* NOTES ADDED BELOW SALARY TABLE 1:1 FROM YOUR IMAGE */}
+        <div style={{ background:'#fff', border:'1px solid #eee', borderRadius:'8px', padding:'14px 12px', marginBottom:'24px' }}>
+          <h3 style={{ color:HOT_GREEN, fontSize:'12px', fontWeight:900, margin:'0 0 8px', textTransform:'uppercase' }}>SALARY QUALIFICATION GUIDELINES</h3>
+          <p style={{ margin:'0 0 10px', fontSize:'11px', color:'#111', lineHeight:'1.5' }}>
+            To qualify for the salary attached to each position, you must maintain a well-balanced ABC team.
+          </p>
+          <p style={{ margin:'0 0 5px', fontSize:'11px', fontWeight:800, color:'#111' }}>Requirement:</p>
+          <ul style={{ margin:'0 0 14px 16px', padding:0, listStyle:'disc' }}>
+            <li style={{ fontSize:'11px', color:'#111', marginBottom:'3px' }}>40% of members must be on your current VIP level</li>
+            <li style={{ fontSize:'11px', color:'#111' }}>60% of members must be on any VIP level above your current VIP level</li>
+          </ul>
+          <p style={{ margin:'0 0 3px', fontSize:'11px', fontWeight:800, color:HOT_GREEN }}>Payment Schedule:</p>
+          <p style={{ margin:'0 0 12px', fontSize:'11px', color:'#111' }}>
+            All qualified salaries are paid on the <span style={{ color:HOT_GREEN, fontWeight:900 }}>15th</span> of each month.
+          </p>
+          <p style={{ margin:0, fontSize:'11px', color:'#111', lineHeight:'1.4' }}>
+            If you meet these requirements, please contact the Hiring Manager to be registered on the company's monthly payroll.
+          </p>
+        </div>
+
         <div style={{ display:'flex', flexDirection:'column', maxWidth:'420px', margin:'0 auto', background:PAGE_BG }}>
           {vips.map(vip => {
             const isCurrent = currentVipLevel===vip.level && (vip.level===0? user.vipActivated : true)

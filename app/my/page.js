@@ -6,6 +6,7 @@ export default function MyPage() {
   const router = useRouter()
   const fileInputRef = useRef(null)
   const HOT_GREEN = '#00C853'
+  const LIGHT_GREEN = '#E8F5E9'
 
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -24,24 +25,17 @@ export default function MyPage() {
     balance: 0,
     totalWithdraw: 0,
     totalDeposit: 0,
-    totalDaily: 0, // LIFETIME
-    todayDaily: 0, // TODAY ONLY - resets Uganda midnight
+    totalDaily: 0,
+    todayDaily: 0,
     totalCommission: 0
   })
 
-  const normalizePhone = (p) => {
-    if (!p) return ''
-    p = String(p).trim().replace(/\D/g, '')
-    return p
-  }
+  const normalizePhone = (p) => String(p||'').trim().replace(/\D/g,'')
   const showToast = (msg, type='error') => {
     setToast({ show: true, msg, type })
     setTimeout(()=> setToast({ show:false, msg:'', type:'' }), 2800)
   }
-
-  const getUgandaToday = () => {
-    return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' })
-  }
+  const getUgandaToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' })
 
   useEffect(()=>{
     async function load(){
@@ -58,84 +52,45 @@ export default function MyPage() {
         let currentUser = localUser
         if(data.success && data.user){
           localStorage.setItem('booksforward_user', JSON.stringify(data.user))
-          setUser(data.user)
-          currentUser = data.user
+          setUser(data.user); currentUser = data.user
           if(data.user.avatar) setAvatar(data.user.avatar)
-        } else { setUser(localUser) }
+        } else setUser(localUser)
 
-        // 2. TRANSACTIONS - lifetime + today
         try {
           const txRes = await fetch(`/api/transactions?phone=${phone}&_t=${Date.now()}`, { cache:'no-store' })
           const txData = await txRes.json()
           const list = txData.transactions || []
-
-          let dep = 0, wd = 0, dailyLifetime = 0, todayDaily = 0, comm = 0
-          const ugToday = getUgandaToday() // e.g. 2026-05-13
-
+          let dep=0, wd=0, dailyLifetime=0, todayDaily=0, comm=0
+          const ugToday = getUgandaToday()
           list.forEach(t=>{
-            const amt = Number(t.amount || 0)
+            const amt = Number(t.amount||0)
             const type = String(t.type||'').toLowerCase().trim()
             const status = String(t.status||'').toLowerCase()
-            const isSuccess = status === 'success' || status === 'completed'
-            if(!isSuccess) return
-
-            // DATE of this tx in Uganda time
-            let txDate = ''
-            try {
+            if(status!=='success' && status!=='completed') return
+            let txDate=''
+            try{
               const d = t.createdAt ? new Date(t.createdAt) : null
-              if (d && !isNaN(d)) {
-                txDate = d.toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' })
-              } else if (typeof t.createdAt === 'string') {
-                txDate = t.createdAt.slice(0,10) // already YYYY-MM-DD-...
-              }
-            } catch {}
-
-            if(type === 'deposit' || type === 'system increase' || type === 'system_increase'){
-              dep += amt
-            } else if(type === 'withdraw'){
-              wd += amt
-            } else if(type === 'daily_income' || type === 'daily income' || type === 'book_income' || type === 'daily'){
-              dailyLifetime += amt
-              if (txDate === ugToday) todayDaily += amt
-            } else if(type === 'team_a_payout' || type === 'team_b_payout' || type === 'team_c_payout' || type === 'commission' || type === 'team' || type === 'myteam' || type === 'invite'){
-              comm += amt
-            } else if(type === 'magical wheel' || type === 'magical_wheel' || type === 'lucky wheel' || type === 'lucky_wheel'){
-              dailyLifetime += amt
-              if (txDate === ugToday) todayDaily += amt
-            }
+              if(d && !isNaN(d)) txDate = d.toLocaleDateString('en-CA', { timeZone:'Africa/Kampala' })
+              else if(typeof t.createdAt==='string') txDate = t.createdAt.slice(0,10)
+            }catch{}
+            if(type==='deposit' || type.includes('system')) dep+=amt
+            else if(type==='withdraw') wd+=amt
+            else if(type.includes('daily') || type.includes('book_income')){ dailyLifetime+=amt; if(txDate===ugToday) todayDaily+=amt }
+            else if(type.includes('team') || type.includes('commission') || type.includes('invite')) comm+=amt
+            else if(type.includes('wheel')){ dailyLifetime+=amt; if(txDate===ugToday) todayDaily+=amt }
           })
-
-          setTotals({
-            balance: Number(currentUser.availableBalance || 0),
-            totalDeposit: dep,
-            totalWithdraw: wd,
-            totalDaily: dailyLifetime,
-            todayDaily: todayDaily,
-            totalCommission: comm
-          })
-        } catch(e){
-          setTotals({
-            balance: Number(currentUser.availableBalance || 0),
-            totalDeposit: 0,
-            totalWithdraw: 0,
-            totalDaily: 0,
-            todayDaily: 0,
-            totalCommission: 0
-          })
-        }
-
-      }catch(e){} finally{ setLoading(false) }
+          setTotals({ balance:Number(currentUser.availableBalance||0), totalDeposit:dep, totalWithdraw:wd, totalDaily:dailyLifetime, todayDaily, totalCommission:comm })
+        }catch{}
+      }catch{} finally{ setLoading(false) }
     }
     load()
   },[router])
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0]
-    if(!file) return
+    const file = e.target.files[0]; if(!file) return
     const reader = new FileReader()
     reader.onload = (ev) => {
-      const base64 = ev.target.result
-      setAvatar(base64)
+      const base64 = ev.target.result; setAvatar(base64)
       localStorage.setItem(`avatar_${normalizePhone(user?.phone)}`, base64)
       fetch('/api/user', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'update', phone: normalizePhone(user?.phone), avatar: base64 }) })
     }
@@ -147,49 +102,40 @@ export default function MyPage() {
     const level = user.vipLevel ?? user.vip ?? 0
     let fromDate = user.vipStartDate ? new Date(user.vipStartDate) : user.createdAt ? new Date(user.createdAt) : new Date()
     let untilDate = new Date(fromDate)
-    if(Number(level) === 0) untilDate.setDate(untilDate.getDate() + 1)
-    else untilDate.setFullYear(untilDate.getFullYear() + 1)
+    if(Number(level)===0) untilDate.setDate(untilDate.getDate()+1); else untilDate.setFullYear(untilDate.getFullYear()+1)
     if(user.vipExpiresAt) untilDate = new Date(user.vipExpiresAt)
-    const fmt = (d) => {
-      const pad = (n)=> String(n).padStart(2,'0')
-      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-    }
+    const fmt = (d)=>{ const pad=(n)=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` }
     return `Vip${level} valid from ${fmt(fromDate)} until ${fmt(untilDate)}`
   }
 
   const handleSavePassword = async () => {
-    if(!oldPass || !newPass || !repeatPass){ showToast('Fill all fields','error'); return }
-    if(newPass !== repeatPass){ showToast('New passwords do not match','error'); return }
+    if(!oldPass||!newPass||!repeatPass){ showToast('Fill all fields'); return }
+    if(newPass!==repeatPass){ showToast('New passwords do not match'); return }
     setSaving(true)
     try{
-      const res = await fetch('/api/user', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ action:'updatePassword', phone: normalizePhone(user.phone), oldPassword: oldPass, newPassword: newPass })
-      })
+      const res = await fetch('/api/user', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'updatePassword', phone: normalizePhone(user.phone), oldPassword: oldPass, newPassword: newPass }) })
       const data = await res.json()
-      if(!data.success){ showToast(data.message || 'Old password incorrect','error') }
+      if(!data.success) showToast(data.message||'Old password incorrect')
       else { setOldPass(''); setNewPass(''); setRepeatPass(''); showToast('Saved successful','success') }
-    }catch{ showToast('Something went wrong','error') } finally{ setSaving(false) }
+    }catch{ showToast('Something went wrong') } finally{ setSaving(false) }
   }
 
   if(loading) return <div style={{padding:'40px', textAlign:'center'}}>Loading...</div>
 
-  // 6 CARDS NOW
   const cards = [
-    { title:'Total available balance', value: totals.balance },
-    { title:'Total withdraw', value: totals.totalWithdraw },
-    { title:'Total deposit', value: totals.totalDeposit },
-    { title:'Total Daily income', value: totals.totalDaily, sub:'Lifetime' },
-    { title:"Today's income", value: totals.todayDaily, sub:'Resets 00:00 EAT', highlight:true },
-    { title:'Total Commission', value: totals.totalCommission },
+    { title:'TOTAL AVAILABLE BALANCE', value: totals.balance },
+    { title:'TOTAL WITHDRAW', value: totals.totalWithdraw },
+    { title:'TOTAL DEPOSIT', value: totals.totalDeposit },
+    { title:'TOTAL DAILY INCOME', value: totals.totalDaily },
+    { title:"TODAY'S INCOME", value: totals.todayDaily },
+    { title:'TOTAL COMMISSION', value: totals.totalCommission },
   ]
 
   return (
     <div style={{ minHeight:'100vh', background:'#fff' }}>
       <div style={{ background:HOT_GREEN, padding:'14px 18px', display:'flex', alignItems:'center', gap:'12px', position:'sticky', top:0, zIndex:10 }}>
         <button onClick={()=>router.push('/dashboard')} style={{ background:'none', border:'none', color:'#fff', fontSize:'24px', fontWeight:900, cursor:'pointer' }}>←</button>
-        <h1 style={{ margin:0, color:'#fff', fontWeight:900, fontSize:'18px', letterSpacing:'1px' }}>MY</h1>
+        <h1 style={{ margin:0, color:'#fff', fontWeight:900, fontSize:'18px' }}>MY</h1>
       </div>
 
       <div style={{ maxWidth:'480px', margin:'0 auto', padding:'20px 16px 100px' }}>
@@ -205,23 +151,22 @@ export default function MyPage() {
           <p style={{ margin:0, fontSize:'11px', color:'#555', fontWeight:700, textAlign:'center' }}>{getVipValidity()}</p>
         </div>
 
-        {/* 6 HORIZONTAL SQUARE CARDS - 2 PER ROW */}
         <div style={{ marginTop:'22px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }}>
           {cards.map(c=>(
-            <div key={c.title} style={{ 
-              border: c.highlight ? `1.5px solid ${HOT_GREEN}` : '1px solid #eee', 
-              borderRadius:'16px', 
-              padding:'14px 14px', 
+            <div key={c.title} style={{
+              background: LIGHT_GREEN,
+              border:'1px solid #C8E6C9',
+              borderRadius:'16px',
+              padding:'20px 10px',
               aspectRatio:'1 / 1',
               display:'flex',
               flexDirection:'column',
+              alignItems:'center',
               justifyContent:'center',
-              background: c.highlight ? '#f0fff4' : '#fff',
-              boxShadow:'0 2px 10px rgba(0,0,0,0.06)' 
+              textAlign:'center',
             }}>
-              <p style={{ margin:'0 0 4px', color:HOT_GREEN, fontSize:'11px', fontWeight:800, lineHeight:'1.2' }}>{c.title}</p>
-              {c.sub && <p style={{ margin:'0 0 6px', color:'#999', fontSize:'9px', fontWeight:700 }}>{c.sub}</p>}
-              <p style={{ margin:0, fontSize:'16px', fontWeight:900, wordBreak:'break-all' }}>{Number(c.value).toLocaleString()} UGX</p>
+              <p style={{ margin:'0 0 12px', color:HOT_GREEN, fontSize:'11px', fontWeight:900, lineHeight:'1.2' }}>{c.title}</p>
+              <p style={{ margin:0, fontSize:'15px', fontWeight:900, color:'#111' }}>{Number(c.value).toLocaleString()} UGX</p>
             </div>
           ))}
         </div>
@@ -238,14 +183,13 @@ export default function MyPage() {
               <button onClick={()=>f.ss(!f.sh)} style={{ position:'absolute', right:'10px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer' }}>{f.sh?'🙈':'👁️'}</button>
             </div>
           ))}
-          <button onClick={handleSavePassword} disabled={saving} style={{ width:'100%', background:HOT_GREEN, color:'#fff', border:'none', padding:'13px', borderRadius:'999px', fontWeight:900, cursor:'pointer' }}>{saving?'Saving...':'Save'}</button>
+          <button onClick={handleSavePassword} disabled={saving} style={{ width:'100%', background:HOT_GREEN, color:'#fff', border:'none', padding:'13px', borderRadius:'999px', fontWeight:900 }}>{saving?'Saving...':'Save'}</button>
         </div>
 
-        <button onClick={()=>setShowLogout(true)} style={{ marginTop:'30px', width:'100%', background:'#fff', border:'1px solid #ddd', padding:'13px', borderRadius:'999px', fontWeight:900, cursor:'pointer' }}>Logout</button>
+        <button onClick={()=>setShowLogout(true)} style={{ marginTop:'30px', width:'100%', background:'#fff', border:'1px solid #ddd', padding:'13px', borderRadius:'999px', fontWeight:900 }}>Logout</button>
       </div>
 
       {toast.show && <div style={{ position:'fixed', top:'20px', left:'50%', transform:'translateX(-50%)', background: toast.type==='success'?HOT_GREEN:'#ff4444', color:'#fff', padding:'12px 22px', borderRadius:'999px', fontWeight:800, zIndex:9999 }}>{toast.msg}</div>}
-
       {showLogout && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100 }}>
           <div style={{ background:'#fff', padding:'24px', borderRadius:'16px', width:'85%', maxWidth:'340px', textAlign:'center' }}>
