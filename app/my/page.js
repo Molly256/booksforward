@@ -20,12 +20,12 @@ export default function MyPage() {
   const [toast, setToast] = useState({ show: false, msg: '', type: '' })
   const [showLogout, setShowLogout] = useState(false)
 
-  // Totals from transactions API - never deleted, accumulates forever
   const [totals, setTotals] = useState({
     balance: 0,
     totalWithdraw: 0,
     totalDeposit: 0,
-    totalDaily: 0,
+    totalDaily: 0, // LIFETIME
+    todayDaily: 0, // TODAY ONLY - resets Uganda midnight
     totalCommission: 0
   })
 
@@ -39,6 +39,10 @@ export default function MyPage() {
     setTimeout(()=> setToast({ show:false, msg:'', type:'' }), 2800)
   }
 
+  const getUgandaToday = () => {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' })
+  }
+
   useEffect(()=>{
     async function load(){
       try{
@@ -49,7 +53,6 @@ export default function MyPage() {
         const savedAvatar = localStorage.getItem(`avatar_${phone}`)
         if(savedAvatar) setAvatar(savedAvatar)
 
-        // 1. API USER - for username display
         const res = await fetch(`/api/user?action=getDashboard&phone=${phone}&_t=${Date.now()}`, { cache:'no-store' })
         const data = await res.json()
         let currentUser = localUser
@@ -60,33 +63,45 @@ export default function MyPage() {
           if(data.user.avatar) setAvatar(data.user.avatar)
         } else { setUser(localUser) }
 
-        // 2. API TRANSACTIONS - collect new transactions for big numbers
-        // This uses bf:tx:{phone}:history which never gets deleted
+        // 2. TRANSACTIONS - lifetime + today
         try {
           const txRes = await fetch(`/api/transactions?phone=${phone}&_t=${Date.now()}`, { cache:'no-store' })
           const txData = await txRes.json()
           const list = txData.transactions || []
 
-          let dep = 0, wd = 0, daily = 0, comm = 0
+          let dep = 0, wd = 0, dailyLifetime = 0, todayDaily = 0, comm = 0
+          const ugToday = getUgandaToday() // e.g. 2026-05-13
 
           list.forEach(t=>{
             const amt = Number(t.amount || 0)
             const type = String(t.type||'').toLowerCase().trim()
             const status = String(t.status||'').toLowerCase()
             const isSuccess = status === 'success' || status === 'completed'
+            if(!isSuccess) return
 
-            if(!isSuccess) return // only count success for lifetime totals
+            // DATE of this tx in Uganda time
+            let txDate = ''
+            try {
+              const d = t.createdAt ? new Date(t.createdAt) : null
+              if (d && !isNaN(d)) {
+                txDate = d.toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' })
+              } else if (typeof t.createdAt === 'string') {
+                txDate = t.createdAt.slice(0,10) // already YYYY-MM-DD-...
+              }
+            } catch {}
 
             if(type === 'deposit' || type === 'system increase' || type === 'system_increase'){
               dep += amt
             } else if(type === 'withdraw'){
               wd += amt
-            } else if(type === 'daily_income' || type === 'daily income' || type === 'book_income'){
-              daily += amt
+            } else if(type === 'daily_income' || type === 'daily income' || type === 'book_income' || type === 'daily'){
+              dailyLifetime += amt
+              if (txDate === ugToday) todayDaily += amt
             } else if(type === 'team_a_payout' || type === 'team_b_payout' || type === 'team_c_payout' || type === 'commission' || type === 'team' || type === 'myteam' || type === 'invite'){
               comm += amt
             } else if(type === 'magical wheel' || type === 'magical_wheel' || type === 'lucky wheel' || type === 'lucky_wheel'){
-              daily += amt // wheel counts to daily
+              dailyLifetime += amt
+              if (txDate === ugToday) todayDaily += amt
             }
           })
 
@@ -94,16 +109,17 @@ export default function MyPage() {
             balance: Number(currentUser.availableBalance || 0),
             totalDeposit: dep,
             totalWithdraw: wd,
-            totalDaily: daily,
+            totalDaily: dailyLifetime,
+            todayDaily: todayDaily,
             totalCommission: comm
           })
         } catch(e){
-          // fallback if transactions fail
           setTotals({
             balance: Number(currentUser.availableBalance || 0),
             totalDeposit: 0,
             totalWithdraw: 0,
             totalDaily: 0,
+            todayDaily: 0,
             totalCommission: 0
           })
         }
@@ -159,11 +175,13 @@ export default function MyPage() {
 
   if(loading) return <div style={{padding:'40px', textAlign:'center'}}>Loading...</div>
 
+  // 6 CARDS NOW
   const cards = [
     { title:'Total available balance', value: totals.balance },
     { title:'Total withdraw', value: totals.totalWithdraw },
     { title:'Total deposit', value: totals.totalDeposit },
-    { title:'Total Daily income', value: totals.totalDaily },
+    { title:'Total Daily income', value: totals.totalDaily, sub:'Lifetime' },
+    { title:"Today's income", value: totals.todayDaily, sub:'Resets 00:00 EAT', highlight:true },
     { title:'Total Commission', value: totals.totalCommission },
   ]
 
@@ -174,7 +192,7 @@ export default function MyPage() {
         <h1 style={{ margin:0, color:'#fff', fontWeight:900, fontSize:'18px', letterSpacing:'1px' }}>MY</h1>
       </div>
 
-      <div style={{ maxWidth:'480px', margin:'0 auto', padding:'20px 20px 100px' }}>
+      <div style={{ maxWidth:'480px', margin:'0 auto', padding:'20px 16px 100px' }}>
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
           <div style={{ position:'relative' }}>
             <div onClick={()=>fileInputRef.current?.click()} style={{ width:'92px', height:'92px', borderRadius:'50%', background:'#f2f2f2', border:`2px solid ${HOT_GREEN}`, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
@@ -187,11 +205,23 @@ export default function MyPage() {
           <p style={{ margin:0, fontSize:'11px', color:'#555', fontWeight:700, textAlign:'center' }}>{getVipValidity()}</p>
         </div>
 
-        <div style={{ marginTop:'22px', display:'flex', flexDirection:'column', gap:'12px' }}>
+        {/* 6 HORIZONTAL SQUARE CARDS - 2 PER ROW */}
+        <div style={{ marginTop:'22px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }}>
           {cards.map(c=>(
-            <div key={c.title} style={{ border:'1px solid #eee', borderRadius:'14px', padding:'14px 16px', boxShadow:'0 2px 10px rgba(0,0,0,0.06)' }}>
-              <p style={{ margin:'0 0 6px', color:HOT_GREEN, fontSize:'12px', fontWeight:800 }}>{c.title}</p>
-              <p style={{ margin:0, fontSize:'20px', fontWeight:900 }}>{Number(c.value).toLocaleString()} UGX</p>
+            <div key={c.title} style={{ 
+              border: c.highlight ? `1.5px solid ${HOT_GREEN}` : '1px solid #eee', 
+              borderRadius:'16px', 
+              padding:'14px 14px', 
+              aspectRatio:'1 / 1',
+              display:'flex',
+              flexDirection:'column',
+              justifyContent:'center',
+              background: c.highlight ? '#f0fff4' : '#fff',
+              boxShadow:'0 2px 10px rgba(0,0,0,0.06)' 
+            }}>
+              <p style={{ margin:'0 0 4px', color:HOT_GREEN, fontSize:'11px', fontWeight:800, lineHeight:'1.2' }}>{c.title}</p>
+              {c.sub && <p style={{ margin:'0 0 6px', color:'#999', fontSize:'9px', fontWeight:700 }}>{c.sub}</p>}
+              <p style={{ margin:0, fontSize:'16px', fontWeight:900, wordBreak:'break-all' }}>{Number(c.value).toLocaleString()} UGX</p>
             </div>
           ))}
         </div>
