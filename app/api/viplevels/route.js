@@ -21,18 +21,16 @@ let CACHED_VALID_BOOKS = null;
 function getValidBooksCached() {
   if (CACHED_VALID_BOOKS) return CACHED_VALID_BOOKS;
   try {
-    const booksPath = path.join(process.cwd(), 'app/data/books.json');
     const jsPath = path.join(process.cwd(), 'app/data.js');
     let allBooks = [];
     try {
-      allBooks = JSON.parse(fs.readFileSync(booksPath, 'utf8'));
-    } catch {
-      try {
-        const mod = require(jsPath);
-        allBooks = mod.default || mod.books || mod;
-      } catch {}
-    }
-    // FIXED: don't crash if covers folder missing on Vercel
+      // ONLY from app/data.js
+      delete require.cache[require.resolve(jsPath)];
+      const mod = require(jsPath);
+      allBooks = mod.default || mod.books || mod;
+      if (!Array.isArray(allBooks)) allBooks = [];
+    } catch {}
+
     const coversPath = path.join(process.cwd(), 'public/books/covers');
     try {
       if (fs.existsSync(coversPath)) {
@@ -47,11 +45,11 @@ function getValidBooksCached() {
         }
       }
     } catch {}
-    // if no covers folder, use allBooks as-is - so upgrade still activates immediately
-    CACHED_VALID_BOOKS = allBooks;
+    CACHED_VALID_BOOKS = allBooks.length? allBooks : [{ id: '1', title: 'Book 1' }];
     return CACHED_VALID_BOOKS;
   } catch {
-    return CACHED_VALID_BOOKS || [];
+    CACHED_VALID_BOOKS = [{ id: '1', title: 'Book 1' }];
+    return CACHED_VALID_BOOKS;
   }
 }
 
@@ -72,8 +70,9 @@ const getUgandaDateTimeString = () => new Date().toLocaleString("en-CA", { timeZ
 function assignBooksToUser(phone, vipLevel, today, pipeline) {
   const selectedVip = VIPS[vipLevel];
   const validBooks = pickRandomBooks(selectedVip.books);
-  if (!validBooks.length) throw new Error('No books found');
-
+  if (!validBooks.length) {
+    return { unlockedBooks: [], assignedBooksMeta: [] };
+  }
   validBooks.forEach(b => {
     const id = String(b.id || b._id);
     pipeline.hset(P + 'book:' + phone + ':' + today + ':' + id, {
@@ -82,7 +81,6 @@ function assignBooksToUser(phone, vipLevel, today, pipeline) {
     });
     pipeline.sadd(P + 'books:' + phone + ':' + today, id);
   });
-
   return {
     unlockedBooks: validBooks.map(b => String(b.id || b._id)),
     assignedBooksMeta: validBooks.map(b => ({ id: String(b.id || b._id), title: b.title, cover: '/books/covers/' + (b.id || b._id) + '.jpg', reward: selectedVip.perBook }))
@@ -140,12 +138,14 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: 'Insufficient Balance' }, { status: 400 });
     }
     const isFirst = user.hasBoughtVip!== 'true' && user.hasBoughtVip!== true;
+
     let unlockedBooks = [], assignedBooksMeta = [];
     if (!isSunday) {
       const assignResult = assignBooksToUser(phone, vipLevel, dateStr, pipeline);
       unlockedBooks = assignResult.unlockedBooks;
       assignedBooksMeta = assignResult.assignedBooksMeta;
     }
+
     pipeline.lpush(historyKey, JSON.stringify({ id: 'up_' + Date.now(), type: 'upgrade_vip', amount: String(-upgradeCost), note: 'Vip' + vipLevel + ' Upgrade', status: 'success', createdAt: timeStr }));
     pipeline.hincrby(userKey, 'spins', 1);
     pipeline.hset(userKey, {
@@ -168,7 +168,7 @@ export async function POST(req) {
     return NextResponse.json({ success: true, user: updated, books: assignedBooksMeta, isSunday });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: 'Upgrade failed, please try again' }, { status: 500 });
   }
 }
 
@@ -176,7 +176,7 @@ async function processHierarchicalCommissions(buyerPhone, buyerVipLevel) {
   try {
     const vipAmts = { 0: 0, 1: 50000, 2: 230000, 3: 650000, 4: 850000 };
     const timeStr = new Date().toLocaleString("en-CA", { timeZone: "Africa/Kampala", hour12: false }).slice(0, 16).replace(',', ' ');
-    const rates = [0.10, 0.02, 0.01], labels = ['A', 'B', 'C'], typeFlags = ['team_a_payout', 'team_b_payout', 'team_c_payout'];
+    const rates = [0.10, 0.03, 0.01], labels = ['A', 'B', 'C'], typeFlags = ['team_a_payout', 'team_b_payout', 'team_c_payout'];
     const parent = await redis.hget(P + 'user:' + buyerPhone, 'invited_by');
     if (!parent ||!/^07\d{8}$/.test(String(parent).trim())) return;
     const cleanParent = String(parent).trim();
