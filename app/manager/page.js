@@ -1,5 +1,4 @@
 'use client'
-import Card from '../../components/Card'
 
 export default function ManagerPage() {
   const managers = [
@@ -9,28 +8,40 @@ export default function ManagerPage() {
   const getWaLink = (phone) => `https://wa.me/${phone}?text=${encodeURIComponent('hello 👋 manager Jenn Vance')}`
 
   return (
-    <Card>
-      <main style={{
-        minHeight: '100vh',
+    <main style={{
+      minHeight: '100vh',
+      background: '#FFFFFF',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      {/* HEADER - HOT GREEN + WHITE BOLD */}
+      <div style={{ background: '#00C853', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <h1 style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', letterSpacing: '1px', textTransform: 'uppercase', margin: 0 }}>
+          Customer service
+        </h1>
+      </div>
+
+      <div style={{
+        flex: 1,
         background: '#FFFFFF',
         padding: '20px',
         paddingBottom: '96px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        textAlign: 'center'
       }}>
-        <div style={{
-          background: '#FFFFFF',
-          border: '1px solid #E0E0E0',
-          borderRadius: '20px',
-          padding: '30px 20px',
-          textAlign: 'center',
-          maxWidth: '400px',
-          width: '100%',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-        }}>
-          <div style={{ fontSize: '48px', marginBottom: '15px' }}>🎧</div>
+          {/* HEADPHONES - BLACK + HOT GREEN EAR COVERS */}
+          <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'center' }}>
+            <svg width="64" height="64" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 50 C15 20 30 10 50 10 C70 10 85 20 85 50" stroke="#111" strokeWidth="9" strokeLinecap="round" fill="none"/>
+              <rect x="10" y="42" width="20" height="38" rx="10" fill="#111" />
+              <rect x="70" y="42" width="20" height="38" rx="10" fill="#111" />
+              <rect x="14" y="46" width="12" height="30" rx="6" fill="#00C853" />
+              <rect x="74" y="46" width="12" height="30" rx="6" fill="#00C853" />
+            </svg>
+          </div>
           
           <h1 style={{ 
             fontSize: '24px', 
@@ -45,7 +56,8 @@ export default function ManagerPage() {
             fontSize: '14px', 
             color: '#666',
             marginBottom: '25px',
-            lineHeight: '1.5'
+            lineHeight: '1.5',
+            maxWidth: '300px'
           }}>
             Need online assistance? Please contact the hiring manager.
           </p>
@@ -56,6 +68,7 @@ export default function ManagerPage() {
               onClick={() => window.open(getWaLink(mgr.phone), "_blank")}
               style={{
                 width: '100%',
+                maxWidth: '340px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -74,20 +87,7 @@ export default function ManagerPage() {
               👤 Chat with {mgr.name}
             </button>
           ))}
-
-          <div style={{
-            marginTop: '20px',
-            padding: '12px',
-            background: '#f5f5f5',
-            borderRadius: '10px',
-            fontSize: '12px',
-            color: '#666',
-            textAlign: 'left'
-          }}>
-            <div>📱 Manager Jenn Vance: +1 (551) 337-7400</div>
-          </div>
-        </div>
-      </main>
-    </Card>
+      </div>
+    </main>
   )
 }
