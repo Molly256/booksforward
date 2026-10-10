@@ -14,7 +14,7 @@ export default function AboutPage() {
       <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
         <div style={{ background: '#F6FFF8', border: `2px solid ${HOT_GREEN}`, borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#111', lineHeight: '1.3', marginBottom: '12px' }}>
-            Looking for an experienced, innovative PR team to elevate your book?
+            Looking for an experienced, innovative promoting team to elevate your book?
           </h2>
           <p style={{ fontSize: '13.5px', color: '#333', lineHeight: '1.6', fontWeight: '500' }}>
             For decades, <span style={{ fontWeight: '900', color: HOT_GREEN }}>Books Forward</span> has exemplified excellence in book marketing and promotion, with over <b>1,200 authors</b> entrusting our team to advance their writing careers.
@@ -82,7 +82,7 @@ export default function AboutPage() {
 
         <div style={{ background: '#111', borderRadius: '14px', padding: '18px', textAlign: 'center' }}>
           <p style={{ color: HOT_GREEN, fontSize: '16px', fontWeight: '900', marginBottom: '6px' }}>Books Forward</p>
-          <p style={{ color: '#fff', fontSize: '13px', fontWeight: '700' }}>Phone: (615) 212-8549</p>
+          <p style={{ color: '#fff', fontSize: '13px', fontWeight: '700' }}>Phone: +1(551)337-7400</p>
         </div>
       </div>
     </main>
