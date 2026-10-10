@@ -2,8 +2,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 import { Redis } from '@upstash/redis';
 import { NextResponse } from 'next/server';
-import * as dataModule from '../../data.js';
-const booksData = dataModule.default || dataModule.books || dataModule.data || dataModule.allBooks || dataModule;
+import { BOOKS } from '../../data.js';
 
 const redis = Redis.fromEnv();
 const P = 'bf:';
@@ -18,16 +17,8 @@ export const VIPS = {
 let CACHED_VALID_BOOKS = null;
 function getValidBooksCached(){
   if(CACHED_VALID_BOOKS) return CACHED_VALID_BOOKS;
-  let allBooks = booksData?.default || booksData?.books || booksData?.data || booksData;
-  if(!Array.isArray(allBooks)){
-    // if booksData itself is the object with named exports
-    if(Array.isArray(dataModule.books)) allBooks = dataModule.books;
-    else if(Array.isArray(dataModule.data)) allBooks = dataModule.data;
-    else allBooks = [];
-  }
-  if(allBooks.length === 0){
-    allBooks = Array.from({length: 100}, (_,i)=>({id:`book_${i+1}`, _id:`book_${i+1}`, title:`Book ${i+1}`}));
-  }
+  let allBooks = BOOKS;
+  if(!Array.isArray(allBooks)) allBooks = [];
   CACHED_VALID_BOOKS = allBooks;
   return allBooks;
 }
@@ -48,13 +39,13 @@ function assignBooksToUser(phone,vipLevel,today,pipeline){
   const validBooks=pickRandomBooks(selectedVip.books);
   if(!validBooks.length) return {unlockedBooks:[],assignedBooksMeta:[]};
   validBooks.forEach(b=>{
-    const id=String(b.id||b._id);
-    pipeline.hset(P+'book:'+phone+':'+today+':'+id,{phone,bookId:id,vipLevel:String(vipLevel),reward:String(selectedVip.perBook),title:b.title,cover:'/books/covers/'+id+'.jpg',status:'pending',date:today,createdAt:String(Date.now())});
+    const id=String(b.bookId || b.id || b._id);
+    pipeline.hset(P+'book:'+phone+':'+today+':'+id,{phone,bookId:id,vipLevel:String(vipLevel),reward:String(selectedVip.perBook),title:b.title,cover:b.cover || '/books/covers/'+id+'.jpg',status:'pending',date:today,createdAt:String(Date.now())});
     pipeline.sadd(P+'books:'+phone+':'+today,id);
   });
   return{
-    unlockedBooks:validBooks.map(b=>String(b.id||b._id)),
-    assignedBooksMeta:validBooks.map(b=>({id:String(b.id||b._id),title:b.title,cover:'/books/covers/'+String(b.id||b._id)+'.jpg',reward:selectedVip.perBook}))
+    unlockedBooks:validBooks.map(b=>String(b.bookId || b.id || b._id)),
+    assignedBooksMeta:validBooks.map(b=>({id:String(b.bookId || b.id || b._id),title:b.title,cover:b.cover || '/books/covers/'+String(b.bookId || b.id || b._id)+'.jpg',reward:selectedVip.perBook}))
   };
 }
 export async function GET(req){
@@ -75,7 +66,6 @@ export async function POST(req){
     const userKey=P+'user:'+phone,user=await redis.hgetall(userKey);
     if(!user||!user.phone) return NextResponse.json({success:false,message:'User not found'},{status:404});
     const dateStr=getUgandaDateString(),timeStr=getUgandaDateTimeString(),historyKey=P+'tx:'+phone+':history';
-    const ugDay=new Date(new Date().toLocaleString("en-US",{timeZone:"Africa/Kampala"})).getDay();const isSunday=ugDay===0;
     const pipeline=redis.pipeline();let unlockedBooksArr=[],assignedBooksMetaArr=[];
     if(vipLevel===0){
       if(user.vipActivated==='true'||user.vipActivated===true) return NextResponse.json({success:false,message:'Vip0 already activated'},{status:400});
@@ -95,17 +85,16 @@ export async function POST(req){
       const isFirst=user.hasBoughtVip!=='true'&&user.hasBoughtVip!==true;
       pipeline.hincrby(userKey,'availableBalance',-tierCost);
       if(user.balance) pipeline.hincrby(userKey,'balance',-tierCost);
-      if(!isSunday){
-        const assignResult=assignBooksToUser(phone,vipLevel,dateStr,pipeline);
-        unlockedBooksArr=assignResult.unlockedBooks;assignedBooksMetaArr=assignResult.assignedBooksMeta;
-      }
+      // ALWAYS SEED - Sunday check removed
+      const assignResult=assignBooksToUser(phone,vipLevel,dateStr,pipeline);
+      unlockedBooksArr=assignResult.unlockedBooks;assignedBooksMetaArr=assignResult.assignedBooksMeta;
       pipeline.lpush(historyKey,JSON.stringify({id:'up_'+Date.now(),type:'upgrade_vip',amount:String(-tierCost),note:'Vip'+vipLevel+' Upgrade',status:'success',createdAt:timeStr}));
       pipeline.hincrby(userKey,'spins',1);
       pipeline.hset(userKey,{vip:String(vipLevel),vipPricePaid:String(tierCost),hasBoughtVip:'true',vipActivated:'true',vipExpiry:new Date(Date.now()+31536000000).toISOString(),unlockedBooks:JSON.stringify(unlockedBooksArr),completedBooks:'[]',books_read_today:'0',dailyIncome:'0',lastResetDate:dateStr,vip_bought_date:dateStr});
       await pipeline.exec();
       if(isFirst) await processHierarchicalCommissions(phone,vipLevel);
       const updatedUser=await redis.hgetall(userKey);
-      return NextResponse.json({success:true,message:`Successfully upgraded to VIP ${vipLevel}`,user:updatedUser,books:assignedBooksMetaArr,isSunday});
+      return NextResponse.json({success:true,message:`Successfully upgraded to VIP ${vipLevel}`,user:updatedUser,books:assignedBooksMetaArr});
     }
   }catch(err){return NextResponse.json({success:false,message:err.message},{status:500});}
 }
