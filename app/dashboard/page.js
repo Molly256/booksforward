@@ -95,15 +95,37 @@ export default function Dashboard() {
           {menuItems.map(item => (
             <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{ textAlign: 'center' }}>
+                {/* OPEN BOOK BUTTON - SAME COLORED EMOJI */}
                 <div style={{
-                  width: '100%', height: '125px',
-                  background: HOT_GREEN,
-                  borderRadius: '18px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '42px', color: '#fff',
-                  boxShadow: '0 6px 14px rgba(0,200,83,0.35)'
+                  width: '100%',
+                  height: '125px',
+                  position: 'relative',
+                  filter: 'drop-shadow(0 6px 12px rgba(0,200,83,0.35))',
                 }}>
-                  {item.icon}
+                  <svg viewBox="0 0 200 135" width="100%" height="100%" style={{ display:'block' }}>
+                    {/* book thickness bottom */}
+                    <path d="M10 20 C 55 6, 100 9, 100 9 C 100 9, 145 6, 190 20 L 190 115 C 145 101, 100 104, 100 104 C 100 104, 55 101, 10 115 Z" fill="#0A8F3A" />
+                    {/* hot green cover */}
+                    <path d="M12 18 C 55 4, 99 7, 100 7 C 101 7, 145 4, 188 18 L 188 108 C 145 94, 101 97, 100 97 C 99 97, 55 94, 12 108 Z" fill={HOT_GREEN} />
+                    {/* left page highlight */}
+                    <path d="M14 22 C 50 12, 90 13, 98 14 L 98 92 C 90 92, 50 91, 14 101 Z" fill="#FFFFFF" opacity="0.12" />
+                    {/* right page highlight */}
+                    <path d="M102 14 C 110 13, 150 12, 186 22 L 186 101 C 150 91, 110 92, 102 92 Z" fill="#FFFFFF" opacity="0.12" />
+                    {/* spine line */}
+                    <path d="M100 7 L 100 97" stroke="#075E26" strokeWidth="1.5" opacity="0.35" />
+                  </svg>
+                  {/* SAME COLORED EMOJI ON TOP */}
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '42px',
+                    paddingBottom: '6px'
+                  }}>
+                    {item.icon}
+                  </div>
                 </div>
                 <p style={{ margin: '8px 0 0', fontSize: '13px', fontWeight: '800', color: '#111' }}>
                   {item.label}
