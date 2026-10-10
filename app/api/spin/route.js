@@ -9,6 +9,8 @@ const redis = new Redis({
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const P = 'bf:';
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -22,8 +24,8 @@ export async function POST(request) {
     }
 
     const cleanPhone = String(phone).trim();
-    const userKey = `user:${cleanPhone}`;
-    const txKey = `tx:${cleanPhone}:history`;
+    const userKey = `${P}user:${cleanPhone}`;
+    const txKey = `${P}tx:${cleanPhone}:history`;
 
     const currentSpins = parseInt(await redis.hget(userKey, 'spins') || '0', 10);
 
@@ -34,39 +36,40 @@ export async function POST(request) {
       );
     }
 
-    const prizeAmount = 2000;
+    const prizeAmount = 2990;
     const timestamp = Date.now();
+    const ugTime = new Date().toLocaleString("en-CA", { timeZone: "Africa/Kampala", hour12: false }).slice(0,16).replace(',',' ');
 
-    // NEW BF STYLE TX - matches current app style
+    // tx as magicalwheel
     const txData = {
-      id: `bf_${timestamp}_wheel`,
-      type: 'bf_system_increase',
-      txType: 'bf_system_increase',
-      label: 'bf_lucky_wheel_win',
-      note: 'bf_lucky_wheel_win 2000 shs',
-      amount: prizeAmount, // keep as number like commission does
+      id: `tx_${timestamp}_magicalwheel`,
+      type: 'magicalwheel',
+      txType: 'magicalwheel',
+      label: 'magicalwheel',
+      note: 'Magical Wheel Win - 2990 UGX',
+      amount: String(prizeAmount),
       timestamp: timestamp,
-      createdAt: timestamp,
-      status: 'completed',
-      currency: 'shs',
-      source: 'bf_wheel'
+      createdAt: ugTime,
+      status: 'success',
+      currency: 'UGX',
+      source: 'magicalwheel'
     };
 
     const pipeline = redis.pipeline();
     pipeline.hincrby(userKey, 'spins', -1);
     pipeline.hincrby(userKey, 'availableBalance', prizeAmount);
     pipeline.lpush(txKey, JSON.stringify(txData));
-    pipeline.hget(userKey, 'spins');
-    pipeline.hget(userKey, 'availableBalance');
+    await pipeline.exec();
 
-    const results = await pipeline.exec();
+    const remaining = await redis.hget(userKey, 'spins');
+    const newBal = await redis.hget(userKey, 'availableBalance');
 
     return NextResponse.json({
       success: true,
       winningSliceIndex: 0,
       prizeAmount: prizeAmount,
-      remainingSpins: Number(results[3] || 0),
-      newBalance: Number(results[4] || 0)
+      remainingSpins: Number(remaining || 0),
+      newBalance: Number(newBal || 0)
     });
 
   } catch (error) {

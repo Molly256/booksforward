@@ -32,10 +32,10 @@ export default function MagicalWheelPage() {
           return;
         }
         setPhone(userPhone);
-        const res = await fetch(`/api/user?phone=${userPhone}`);
+        const res = await fetch(`/api/user?phone=${userPhone}`, { cache: 'no-store' });
         const data = await res.json();
         if (data.success && data.user) {
-          setSpins(data.user.spins || 0);
+          setSpins(Number(data.user.spins) || 0);
         }
       } catch (error) {
         console.error("Failed to fetch user data:", error);
@@ -47,18 +47,31 @@ export default function MagicalWheelPage() {
   }, []);
 
   async function startLuckyWheelSpin() {
-    if (isSpinning || spins < 1 || !phone) return;
+    if (isSpinning) return;
+    if (!phone) {
+      alert("Please login again");
+      return;
+    }
+    if (Number(spins) < 1) {
+      alert("You do not have any lucky spins remaining!");
+      return;
+    }
     setIsSpinning(true);
     try {
       const response = await fetch('/api/spin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, type: 'magicalwheel' })
+        body: JSON.stringify({ phone, type: 'magicalwheel' }),
+        cache: 'no-store'
       });
       const data = await response.json();
       if (!response.ok || !data.success) {
         alert(data.error || "No spins available!");
         setIsSpinning(false);
+        // refresh spins from server
+        const res = await fetch(`/api/user?phone=${phone}`, { cache: 'no-store' });
+        const d = await res.json();
+        if(d.success) setSpins(Number(d.user.spins)||0);
         return;
       }
       const baseRotations = 6 * 360;
@@ -70,7 +83,7 @@ export default function MagicalWheelPage() {
       }
       setTimeout(() => {
         setShowModal(true);
-        setSpins(data.remainingSpins);
+        setSpins(Number(data.remainingSpins) || 0);
         setTimeout(() => {
           if (wheelRef.current) {
             wheelRef.current.style.transition = "none";
@@ -149,7 +162,6 @@ export default function MagicalWheelPage() {
             />
           </div>
 
-          {/* FIXED - CLEAR CENTER, NO BLUR */}
           <button 
             onClick={startLuckyWheelSpin}
             disabled={isSpinning || spins < 1}
