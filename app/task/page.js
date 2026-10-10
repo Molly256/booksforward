@@ -34,36 +34,31 @@ export default function TaskPage() {
         }))
         setBooks(mergedBooks)
       }
-      // HISTORY - MERGE SERVER + LOCAL, DON'T OVERWRITE
+      // HISTORY - MERGE SERVER + LOCAL, DON'T OVERWRITE - FIXED TO KEEP ALL MONTHS
       const histRes = await fetch(`/api/books/history?phone=${phone}&_t=${Date.now()}`, { cache: 'no-store' })
       const histJson = await histRes.json()
       const serverHistory = histJson.success ? (histJson.history || []) : []
       
-      // Load local history
       const localHistory = JSON.parse(localStorage.getItem(`task_history_${phone}`) || '[]')
       
-      // Merge and dedupe by bookId
       const merged = [...serverHistory, ...localHistory]
       const unique = []
       const seen = new Set()
       for (const h of merged) {
-        const id = String(h.bookId || h.id)
-        if (!seen.has(id)) {
-          seen.add(id)
+        const uniqueKey = `${String(h.bookId || h.id)}-${String(h.completedAt || '')}-${String(h.id || h.bookId)}`
+        if (!seen.has(uniqueKey)) {
+          seen.add(uniqueKey)
           unique.push(h)
         }
       }
-      // Sort newest first
-      unique.sort((a,b) => new Date(b.completedAt) - new Date(a.completedAt))
+      unique.sort((a,b) => String(b.completedAt||'').localeCompare(String(a.completedAt||'')))
       
       setHistory(unique)
-      // Save merged back to local
       if (unique.length > 0) {
         localStorage.setItem(`task_history_${phone}`, JSON.stringify(unique))
       }
     } catch (err) {
       console.error('Fetch error:', err)
-      // Fallback to local on error
       const phone = JSON.parse(localStorage.getItem('booksforward_user') || '{}').phone
       if (phone) {
         const localHistory = JSON.parse(localStorage.getItem(`task_history_${phone}`) || '[]')
@@ -76,7 +71,6 @@ export default function TaskPage() {
     const userData = JSON.parse(localStorage.getItem('booksforward_user') || '{}')
     if (!userData.phone) return
     setUser(userData)
-    // Load local history instantly before fetch
     const localHistory = JSON.parse(localStorage.getItem(`task_history_${userData.phone}`) || '[]')
     if (localHistory.length > 0) setHistory(localHistory)
     
@@ -169,25 +163,29 @@ export default function TaskPage() {
       localStorage.setItem('completedRead', JSON.stringify(newCompleted))
       localStorage.removeItem('currentlyReading')
 
-      // FIX: CREATE HISTORY ITEM AND SAVE LOCALLY FIRST
       const newHistoryItem = {
-        id: book.bookId,
+        id: String(book.bookId) + '-' + Date.now(),
         bookId: book.bookId,
         title: book.title,
         earned: Number(book.reward || 0),
         cover: '/books/covers/' + book.bookId + '.jpg',
-        completedAt: new Date().toLocaleString("en-CA", { timeZone: "Africa/Kampala" })
+        completedAt: new Date().toLocaleString("en-CA", { timeZone: "Africa/Kampala", hour12: false }).slice(0,16).replace(',', ' ')
       }
       
-      // Update localStorage history - APPEND not replace
       const existingLocal = JSON.parse(localStorage.getItem(`task_history_${user.phone}`) || '[]')
-      // Remove if already exists to avoid duplicate
-      const filtered = existingLocal.filter(h => String(h.bookId) !== String(book.bookId))
-      const updatedLocal = [newHistoryItem, ...filtered]
-      localStorage.setItem(`task_history_${user.phone}`, JSON.stringify(updatedLocal))
-      setHistory(updatedLocal)
+      const updatedLocal = [newHistoryItem, ...existingLocal]
+      const finalDeduped = []
+      const seenKeys = new Set()
+      for (const h of updatedLocal) {
+        const k = `${String(h.bookId)}-${String(h.completedAt)}`
+        if (!seenKeys.has(k)) {
+          seenKeys.add(k)
+          finalDeduped.push(h)
+        }
+      }
+      localStorage.setItem(`task_history_${user.phone}`, JSON.stringify(finalDeduped))
+      setHistory(finalDeduped)
 
-      // Then sync with server
       await fetchBooks(user.phone)
 
     } catch(err) {
@@ -286,7 +284,7 @@ export default function TaskPage() {
             </div>
             {history.length === 0 && <p style={{ color: '#999' }}>No history</p>}
             {history.map((h,i)=>(
-              <div key={`${h.bookId}-${i}`} style={{ display: 'flex', gap: 12, borderBottom: '1px solid #eee', padding: '12px 0', alignItems:'center' }}>
+              <div key={`${h.bookId}-${h.completedAt}-${i}`} style={{ display: 'flex', gap: 12, borderBottom: '1px solid #eee', padding: '12px 0', alignItems:'center' }}>
                 <img src={h.cover || '/books/covers/' + (h.bookId || h.id) + '.jpg'} style={{ width: 56, height: 80, objectFit: 'cover', borderRadius: 6, border:'1px solid #eee' }} alt={h.title} />
                 <div style={{ flex: 1 }}>
                   <p style={{ fontWeight: 900, fontSize: 12, lineHeight:'1.2' }}>{h.title}</p>

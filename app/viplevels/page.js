@@ -21,7 +21,7 @@ const Toast = ({ msg, onClose }) => {
   return <div style={{ position:'fixed', top:'20px', left:'50%', transform:'translateX(-50%)', background:'#000', color:'#fff', padding:'12px 20px', borderRadius:'25px', fontWeight:'700', fontSize:'13px', zIndex:2000 }}>{msg}</div>
 }
 
-const PAGE_BG = '#F2F2F2'
+const PAGE_BG = '#FFFFFF'
 const HOT_GREEN = '#00C853'
 
 function VipImage({ level }) {
@@ -30,7 +30,7 @@ function VipImage({ level }) {
       width: 90,
       height: 110,
       flexShrink: 0,
-      background: PAGE_BG,
+      background: '#FFFFFF',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center'
@@ -43,7 +43,7 @@ function VipImage({ level }) {
           height: '100%',
           objectFit: 'contain',
           display: 'block',
-          background: PAGE_BG,
+          background: '#FFFFFF',
           border: 'none',
           mixBlendMode: 'multiply'
         }}
@@ -99,31 +99,31 @@ export default function VipLevels() {
   const thStyle = { padding:'8px 3px', fontSize:'9.5px', fontWeight:'600', background:HOT_GREEN, border:'1px solid #000', color:'#000', textAlign:'center' }
   const tdStyle = { padding:'7px 3px', fontSize:'9.5px', fontWeight:'400', border:'1px solid #000', color:'#000', textAlign:'center', background:'#fff' }
   const salaryTh = { padding:'12px 6px', fontSize:'11px', fontWeight:'700', background:HOT_GREEN, color:'#fff', textAlign:'center', border:'1px solid #ddd' }
-  const salaryTd = { padding:'10px 6px', fontSize:'11px', fontWeight:'500', color:'#000', textAlign:'center', border:'1px solid #ddd' }
-  const salaryTdGray = {...salaryTd, background:'#f2f2f2'}
+  const salaryTd = { padding:'10px 6px', fontSize:'11px', fontWeight:'500', color:'#000', textAlign:'center', border:'1px solid #ddd', background:'#FFFFFF' }
+  const salaryTdGray = {...salaryTd, background:'#FFFFFF'}
 
   return (
-    <main style={{ minHeight:'100vh', background:PAGE_BG, padding:'0', paddingBottom:'90px' }}>
+    <main style={{ minHeight:'100vh', background:'#FFFFFF', padding:'0', paddingBottom:'90px' }}>
       {toast && <Toast msg={toast} onClose={()=>setToast(null)} />}
       <div style={{ background:HOT_GREEN, padding:'16px', display:'flex', alignItems:'center', gap:'12px' }}>
         <Link href="/dashboard" style={{ width:'36px', height:'36px', background:'#FFF', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', color:HOT_GREEN, fontSize:'20px', fontWeight:'900', textDecoration:'none' }}>←</Link>
         <h1 style={{ color:'#FFF', fontSize:'15px', fontWeight:'900', letterSpacing:'1px' }}>VIP LEVELS</h1>
       </div>
 
-      <div style={{ padding:'12px', maxWidth:'500px', margin:'0 auto', background:PAGE_BG }}>
+      <div style={{ padding:'12px', maxWidth:'500px', margin:'0 auto', background:'#FFFFFF' }}>
         <h2 style={{ fontSize:'13px', fontWeight:'900', color:'#000', margin:'12px 0 4px' }}>INCOME TABLE</h2>
         <p style={{ fontSize:'11px', color:'#666', marginBottom:'8px' }}>6 days / 4 weeks / 12 months</p>
-        <div style={{ width:'100%', overflowX:'auto', marginBottom:'24px' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+        <div style={{ width:'100%', overflowX:'auto', marginBottom:'24px', background:'#FFFFFF' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', background:'#FFFFFF' }}>
             <thead><tr>
               <th style={{...thStyle, width:'10%'}}>VIP</th><th style={{...thStyle, width:'14%'}}>Price</th><th style={{...thStyle, width:'9%'}}>Tasks</th><th style={{...thStyle, width:'9%'}}>Each</th><th style={{...thStyle, width:'12%'}}>Daily</th><th style={{...thStyle, width:'14%'}}>Weekly</th><th style={{...thStyle, width:'14%'}}>Monthly</th><th style={{...thStyle, width:'18%'}}>Per Year</th>
             </tr></thead>
-            <tbody>{[0,1,2,3,4].map(lvl=>{const v=VIPS[lvl]; const weekly=v.daily*6; const monthly=weekly*4; const perYear=monthly*12; const isVip0=lvl===0; return <tr key={lvl}><td style={tdStyle}>V{lvl}</td><td style={tdStyle}>{v.price.toLocaleString()}</td><td style={tdStyle}>{v.books}</td><td style={tdStyle}>{v.perBook.toLocaleString()}</td><td style={tdStyle}>{v.daily.toLocaleString()}</td><td style={tdStyle}>{isVip0?'-':weekly.toLocaleString()}</td><td style={tdStyle}>{isVip0?'-':monthly.toLocaleString()}</td><td style={tdStyle}>{isVip0?'-':perYear.toLocaleString()}</td></tr>})}</tbody>
+            <tbody>{[0,1,2,3,4].map(lvl=>{const v=VIPS[lvl]; const weekly=v.daily*6; const monthly=weekly*4; const perYear=monthly*12; const isVip0=lvl===0; return <tr key={lvl} style={{background:'#FFFFFF'}}><td style={tdStyle}>V{lvl}</td><td style={tdStyle}>{v.price.toLocaleString()}</td><td style={tdStyle}>{v.books}</td><td style={tdStyle}>{v.perBook.toLocaleString()}</td><td style={tdStyle}>{v.daily.toLocaleString()}</td><td style={tdStyle}>{isVip0?'-':weekly.toLocaleString()}</td><td style={tdStyle}>{isVip0?'-':monthly.toLocaleString()}</td><td style={tdStyle}>{isVip0?'-':perYear.toLocaleString()}</td></tr>})}</tbody>
           </table>
         </div>
 
-        <div style={{ width:'100%', overflowX:'auto', marginBottom:'16px' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+        <div style={{ width:'100%', overflowX:'auto', marginBottom:'16px', background:'#FFFFFF' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', background:'#FFFFFF' }}>
             <thead><tr><th style={salaryTh}>POSITION</th><th style={salaryTh}>NUMBER OF MEMBERS</th><th style={salaryTh}>TEAM COUNT</th><th style={salaryTh}>SALARY</th></tr></thead>
             <tbody>
               <tr><td style={salaryTd}>Trainee</td><td style={salaryTd}>8</td><td style={salaryTd}>ABC</td><td style={{...salaryTd, fontWeight:'700'}}>90,000shs</td></tr>
@@ -138,8 +138,7 @@ export default function VipLevels() {
           </table>
         </div>
 
-        {/* NOTES ADDED BELOW SALARY TABLE 1:1 FROM YOUR IMAGE */}
-        <div style={{ background:'#fff', border:'1px solid #eee', borderRadius:'8px', padding:'14px 12px', marginBottom:'24px' }}>
+        <div style={{ background:'#FFFFFF', border:'1px solid #eee', borderRadius:'8px', padding:'14px 12px', marginBottom:'24px' }}>
           <h3 style={{ color:HOT_GREEN, fontSize:'12px', fontWeight:900, margin:'0 0 8px', textTransform:'uppercase' }}>SALARY QUALIFICATION GUIDELINES</h3>
           <p style={{ margin:'0 0 10px', fontSize:'11px', color:'#111', lineHeight:'1.5' }}>
             To qualify for the salary attached to each position, you must maintain a well-balanced ABC team.
@@ -158,12 +157,12 @@ export default function VipLevels() {
           </p>
         </div>
 
-        <div style={{ display:'flex', flexDirection:'column', maxWidth:'420px', margin:'0 auto', background:PAGE_BG }}>
+        <div style={{ display:'flex', flexDirection:'column', maxWidth:'420px', margin:'0 auto', background:'#FFFFFF' }}>
           {vips.map(vip => {
             const isCurrent = currentVipLevel===vip.level && (vip.level===0? user.vipActivated : true)
             let canBuy = vip.level===0?!user.vipActivated &&!user.hasBoughtVip :!user.hasBoughtVip? true : vip.level > currentVipLevel
             return (
-              <div key={vip.level} style={{ background:PAGE_BG, display:'flex', alignItems:'center', padding:'16px 0', borderBottom:'1px solid #E9E9E9' }}>
+              <div key={vip.level} style={{ background:'#FFFFFF', display:'flex', alignItems:'center', padding:'16px 0', borderBottom:'1px solid #E9E9E9' }}>
                 <VipImage level={vip.level} />
                 <div style={{ marginLeft:'16px', flex:1 }}>
                   <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'10px' }}>

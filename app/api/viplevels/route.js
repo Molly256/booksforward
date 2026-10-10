@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 
 const redis = Redis.fromEnv();
-const P = 'bf:'; // 2 projects in one DB
+const P = 'bf:';
 
 export const VIPS = {
   0: { books: 5, perBook: 400, price: 0, days: 1 },
@@ -27,18 +27,31 @@ function getValidBooksCached() {
     try {
       allBooks = JSON.parse(fs.readFileSync(booksPath, 'utf8'));
     } catch {
-      // fallback to app/data.js if json not found
       try {
         const mod = require(jsPath);
         allBooks = mod.default || mod.books || mod;
       } catch {}
     }
+    // FIXED: don't crash if covers folder missing on Vercel
     const coversPath = path.join(process.cwd(), 'public/books/covers');
-    const coverIds = new Set(fs.readdirSync(coversPath).map(f => f.replace(/\.jpg$/i, '')));
-    CACHED_VALID_BOOKS = allBooks.filter(b => coverIds.has(String(b.id || b._id)));
+    try {
+      if (fs.existsSync(coversPath)) {
+        const files = fs.readdirSync(coversPath);
+        if (files.length > 0) {
+          const coverIds = new Set(files.map(f => f.replace(/\.jpg$/i, '')));
+          const filtered = allBooks.filter(b => coverIds.has(String(b.id || b._id)));
+          if (filtered.length > 0) {
+            CACHED_VALID_BOOKS = filtered;
+            return CACHED_VALID_BOOKS;
+          }
+        }
+      }
+    } catch {}
+    // if no covers folder, use allBooks as-is - so upgrade still activates immediately
+    CACHED_VALID_BOOKS = allBooks;
     return CACHED_VALID_BOOKS;
   } catch {
-    return [];
+    return CACHED_VALID_BOOKS || [];
   }
 }
 
@@ -96,7 +109,6 @@ export async function POST(req) {
     const ugDay = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" })).getDay();
     const isSunday = ugDay === 0;
 
-    // VIP0: one-time only, Mon-Sun, hasBoughtVip stays false
     if (vipLevel === 0) {
       if (user.vipActivated === 'true' || user.vipActivated === true) {
         return NextResponse.json({ success: false, message: 'Vip0 already activated' }, { status: 400 });
@@ -120,7 +132,6 @@ export async function POST(req) {
       return NextResponse.json({ success: true, user: updatedUser, books: assignResult.assignedBooksMeta });
     }
 
-    // VIP1-4
     if (vipLevel <= currentVip && (user.hasBoughtVip === 'true' || user.hasBoughtVip === true)) {
       return NextResponse.json({ success: false, message: 'Already owned' }, { status: 400 });
     }
