@@ -20,37 +20,32 @@ export const VIPS = {
 let CACHED_VALID_BOOKS = null;
 function getValidBooksCached() {
   if (CACHED_VALID_BOOKS) return CACHED_VALID_BOOKS;
+  const jsPath = path.join(process.cwd(), 'app/data.js');
+  let allBooks = [];
   try {
-    const jsPath = path.join(process.cwd(), 'app/data.js');
-    let allBooks = [];
-    try {
-      // ONLY from app/data.js
-      delete require.cache[require.resolve(jsPath)];
-      const mod = require(jsPath);
-      allBooks = mod.default || mod.books || mod;
-      if (!Array.isArray(allBooks)) allBooks = [];
-    } catch {}
+    delete require.cache[require.resolve(jsPath)];
+    const mod = require(jsPath);
+    allBooks = mod.default || mod.books || mod;
+    if (!Array.isArray(allBooks)) allBooks = [];
+  } catch {}
 
+  try {
     const coversPath = path.join(process.cwd(), 'public/books/covers');
-    try {
-      if (fs.existsSync(coversPath)) {
-        const files = fs.readdirSync(coversPath);
-        if (files.length > 0) {
-          const coverIds = new Set(files.map(f => f.replace(/\.jpg$/i, '')));
-          const filtered = allBooks.filter(b => coverIds.has(String(b.id || b._id)));
-          if (filtered.length > 0) {
-            CACHED_VALID_BOOKS = filtered;
-            return CACHED_VALID_BOOKS;
-          }
+    if (fs.existsSync(coversPath)) {
+      const files = fs.readdirSync(coversPath);
+      if (files.length > 0) {
+        const coverIds = new Set(files.map(f => f.replace(/\.jpg$/i, '')));
+        const filtered = allBooks.filter(b => coverIds.has(String(b.id || b._id)));
+        if (filtered.length > 0) {
+          CACHED_VALID_BOOKS = filtered;
+          return CACHED_VALID_BOOKS;
         }
       }
-    } catch {}
-    CACHED_VALID_BOOKS = allBooks.length? allBooks : [{ id: '1', title: 'Book 1' }];
-    return CACHED_VALID_BOOKS;
-  } catch {
-    CACHED_VALID_BOOKS = [{ id: '1', title: 'Book 1' }];
-    return CACHED_VALID_BOOKS;
-  }
+    }
+  } catch {}
+
+  CACHED_VALID_BOOKS = allBooks;
+  return CACHED_VALID_BOOKS;
 }
 
 function pickRandomBooks(count) {
