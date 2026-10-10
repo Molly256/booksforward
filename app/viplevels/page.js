@@ -43,7 +43,7 @@ export default function VipLevels() {
         if (data.success && data.user) {
           const fresh = data.user
           const today = getUgandaDateStr()
-          if ((fresh.lastResetDate||'') !== today) {
+          if ((fresh.lastResetDate||'')!== today) {
             fresh.books_read_today = '0'
             fresh.dailyIncome = '0'
             fresh.lastResetDate = today
@@ -79,15 +79,15 @@ export default function VipLevels() {
         body: JSON.stringify({ phone: user.phone, action: 'UPGRADE', payload: { vipLevel: vip.level } })
       })
       const data = await res.json()
-      if (!data.success || !data.user) { setToast(data.message || 'Purchase failed'); return; }
-      
+      if (!data.success ||!data.user) { setToast(data.message || 'Purchase failed'); return; }
+
       localStorage.setItem('booksforward_user', JSON.stringify(data.user))
       setUser(data.user)
       setToast('Upgraded Successful')
-    } catch (err) { 
-      setToast('Error: ' + err.message) 
-    } finally { 
-      setLoading(false) 
+    } catch (err) {
+      setToast('Error: ' + err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -130,11 +130,50 @@ export default function VipLevels() {
           </table>
         </div>
 
+        {/* SALARY TABLE - ADDED 1:1 FROM IMAGE */}
+        <div style={{ margin:'30px 0' }}>
+          <h2 style={{ fontSize:'13px', fontWeight:'900', color:'#000', margin:'0 0 8px 0' }}>SALARY TABLE</h2>
+          <div style={{ width:'100%', overflowX:'auto', border:'1px solid #D0D0D0' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'11px' }}>
+              <thead>
+                <tr>
+                  <th style={{ background:HOT_GREEN, color:'#fff', padding:'10px 6px', fontWeight:'700', textAlign:'center', border:'1px solid #00A844', fontSize:'10px' }}>POSITION</th>
+                  <th style={{ background:HOT_GREEN, color:'#fff', padding:'10px 6px', fontWeight:'700', textAlign:'center', border:'1px solid #00A844', fontSize:'10px' }}>NUMBER OF MEMBERS</th>
+                  <th style={{ background:HOT_GREEN, color:'#fff', padding:'10px 6px', fontWeight:'700', textAlign:'center', border:'1px solid #00A844', fontSize:'10px' }}>TEAM COUNT</th>
+                  <th style={{ background:HOT_GREEN, color:'#fff', padding:'10px 6px', fontWeight:'700', textAlign:'center', border:'1px solid #00A844', fontSize:'10px' }}>SALARY</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>Trainee</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>8</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>ABC</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000', fontWeight:'600' }}>90,000shs</td></tr>
+                <tr style={{ background:'#F2F2F2' }}><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>Team Trainee</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>16</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>ABC</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000', fontWeight:'600' }}>170,000shs</td></tr>
+                <tr><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>Team Leader</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>25</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>ABC</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000', fontWeight:'600' }}>260,000shs</td></tr>
+                <tr style={{ background:'#F2F2F2' }}><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>Team Manager</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>40</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>ABC</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000', fontWeight:'600' }}>420,000shs</td></tr>
+                <tr><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>Regional Supervisor</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>80</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>ABC</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000', fontWeight:'600' }}>820,000shs</td></tr>
+                <tr style={{ background:'#F2F2F2' }}><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>Manager</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>150</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>ABC</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000', fontWeight:'600' }}>1,600,000shs</td></tr>
+                <tr><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>General Manager</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>400</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>ABC</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000', fontWeight:'600' }}>4,200,000shs</td></tr>
+                <tr style={{ background:'#F2F2F2' }}><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>Marketing Manager</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>600</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000' }}>ABC</td><td style={{ padding:'10px 6px', textAlign:'center', border:'1px solid #E0E0E0', color:'#000', fontWeight:'600' }}>6,200,000shs</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style={{ marginTop:'20px', fontSize:'11.5px', lineHeight:'1.5', color:'#000' }}>
+            <h3 style={{ color:HOT_GREEN, fontSize:'12px', fontWeight:'800', margin:'0 0 6px 0', textTransform:'uppercase' }}>Salary Qualification Guidelines</h3>
+            <p style={{ margin:'0 0 8px 0', fontSize:'11.5px' }}>To qualify for the salary attached to each position, you must maintain a well-balanced ABC team.</p>
+            <p style={{ margin:'0 0 4px 0', fontWeight:'700', fontSize:'11.5px' }}>Requirement:</p>
+            <ul style={{ margin:'0 0 12px 18px', padding:0, fontSize:'11.5px' }}>
+              <li style={{ marginBottom:'3px' }}>40% of members must be on your current VIP level</li>
+              <li>60% of members must be on any VIP level above your current VIP level</li>
+            </ul>
+            <p style={{ margin:'0 0 3px 0', color:HOT_GREEN, fontWeight:'700', fontSize:'11.5px' }}>Payment Schedule:</p>
+            <p style={{ margin:'0 0 12px 0', fontSize:'11.5px' }}>All qualified salaries are paid on the <span style={{ color:HOT_GREEN, fontWeight:'700' }}>15th</span> of each month.</p>
+            <p style={{ margin:0, fontSize:'11.5px' }}>If you meet these requirements, please contact the Hiring Manager to be registered on the company's monthly payroll.</p>
+          </div>
+        </div>
+
         <div style={{ display:'flex', flexDirection:'column', maxWidth:'420px', margin:'0 auto' }}>
           {vips.map(vip => {
             // Evaluates active tier states
             const isActiveTier = vipActivated && (currentVipLevel === vip.level);
-            const canBuy = vip.level === 0 ? (!vipActivated && !hasBought) : (vip.level > currentVipLevel || !vipActivated);
+            const canBuy = vip.level === 0? (!vipActivated &&!hasBought) : (vip.level > currentVipLevel ||!vipActivated);
 
             return (
               <div key={vip.level} style={{ display:'flex', alignItems:'center', padding:'16px 0', borderBottom:'1px solid #E9E9E9' }}>
@@ -143,11 +182,11 @@ export default function VipLevels() {
                   <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'10px' }}>
                     <span style={{ fontWeight:800, fontSize:'15px', color:'#111' }}>{vip.price.toLocaleString()} UGX</span>
                   </div>
-                  {isActiveTier ? (
+                  {isActiveTier? (
                     <div style={{ width:'100%', background:'#E8E8E8', borderRadius:'10px', padding:'12px 0', fontWeight:'900', fontSize:'14px', textAlign:'center', color:'#111' }}>✅ CURRENT</div>
-                  ) : canBuy ? (
+                  ) : canBuy? (
                     <button onClick={()=>handleBuyVip(vip)} disabled={loading} style={{ width:'100%', background:HOT_GREEN, color:'#FFFFFF', border:'none', borderRadius:'10px', padding:'12px 0', fontWeight:'900', fontSize:'14px', cursor:'pointer' }}>
-                      {loading ? 'PROCESSING...' : 'UPGRADE'}
+                      {loading? 'PROCESSING...' : 'UPGRADE'}
                     </button>
                   ) : (
                     <div style={{ width:'100%', background:'#E8E8E8', borderRadius:'10px', padding:'12px 0', fontWeight:'900', fontSize:'14px', textAlign:'center', color:'#777' }}>Can't downgrade</div>

@@ -29,11 +29,9 @@ export async function GET(request) {
 
     if (!action) {
       const data = await redis.hgetall(userKey);
-
       if (isEmptyHash(data)) {
         return Response.json({ success: false, message: "User not found" }, { status: 404 });
       }
-
       return Response.json({
         success: true,
         user: {
@@ -50,14 +48,10 @@ export async function GET(request) {
 
     if (action === 'getDashboard') {
       const user = await redis.hgetall(userKey)
-
       if (isEmptyHash(user)) {
         return Response.json({ success: false, message: 'User not found' }, { status: 404 })
       }
-
       const currentAvailable = safeNumber(user.availableBalance, 0)
-
-      // also get team counts for dashboard
       const rawDownlines = await redis.hgetall('bf:downlines:' + String(phone).trim()) || {}
       let teamA = 0, teamB = 0, teamC = 0
       for (const k of Object.keys(rawDownlines)) {
@@ -65,7 +59,6 @@ export async function GET(request) {
         else if (rawDownlines[k] === '2') teamB++
         else if (rawDownlines[k] === '3') teamC++
       }
-
       return Response.json({
         success: true,
         user: {
@@ -107,24 +100,19 @@ export async function POST(request) {
 
     if (action === 'login') {
       const user = await redis.hgetall(userKey)
-
       if (isEmptyHash(user)) {
         return Response.json({ success: false, message: 'User not found' }, { status: 404 })
       }
-
-      if (String(user.password || '')!== String(password)) {
+      if (String(user.password || '').trim() !== String(password).trim()) {
         return Response.json({ success: false, message: 'Wrong password' }, { status: 401 })
       }
-
-      const currentAvailable = safeNumber(user.availableBalance, 0)
-
       return Response.json({
         success: true,
         user: {
           phone: user.phone? String(user.phone) : '',
           username: user.username? String(user.username) : '',
           inviteCode: user.inviteCode? String(user.inviteCode) : '',
-          availableBalance: currentAvailable,
+          availableBalance: safeNumber(user.availableBalance, 0),
           vip: safeNumber(user.vip),
           avatar: user.avatar || '',
           spins: safeNumber(user.spins, 0)
@@ -135,24 +123,20 @@ export async function POST(request) {
     if (action === 'update') {
       const updateData = {}
       if (username) updateData.username = String(username)
-      if (password) updateData.password = String(password)
+      if (password) updateData.password = String(password).trim()
       if (avatar) updateData.avatar = String(avatar)
-
       if (Object.keys(updateData).length === 0) {
         return Response.json({ success: false, message: 'No update data provided' }, { status: 400 })
       }
-
       await redis.hset(userKey, updateData)
       const updatedUser = await redis.hgetall(userKey)
-      const currentAvailable = safeNumber(updatedUser.availableBalance, 0)
-
       return Response.json({
         success: true,
         user: {
           phone: updatedUser.phone? String(updatedUser.phone) : '',
           username: updatedUser.username? String(updatedUser.username) : '',
           inviteCode: updatedUser.inviteCode? String(updatedUser.inviteCode) : '',
-          availableBalance: currentAvailable,
+          availableBalance: safeNumber(updatedUser.availableBalance, 0),
           vip: safeNumber(updatedUser.vip),
           avatar: updatedUser.avatar || '',
           spins: safeNumber(updatedUser.spins, 0)
@@ -170,13 +154,15 @@ export async function POST(request) {
       if (isEmptyHash(user)) {
         return Response.json({ success: false, message: "User not found" }, { status: 404 });
       }
+      // FIXED: trim + toString
+      const stored = String(user.password ?? '').trim();
+      const oldP = String(oldPassword ?? '').trim();
+      const newP = String(newPassword ?? '').trim();
 
-      const currentPassword = String(user.password || '');
-      if (currentPassword!== String(oldPassword)) {
+      if (stored !== oldP) {
         return Response.json({ success: false, message: "Incorrect old password" }, { status: 400 });
       }
-
-      await redis.hset(userKey, { password: String(newPassword) });
+      await redis.hset(userKey, { password: newP });
       return Response.json({ success: true, message: "Password updated" });
     }
 
