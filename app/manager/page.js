@@ -47,9 +47,7 @@ export default function ManagerPage() {
             marginBottom: '25px',
             lineHeight: '1.5'
           }}>
-            Need help with deposit, withdrawal, or VIP issues? 
-            Chat with our manager directly on WhatsApp. 
-            We reply within 5 minutes.
+            Need online assistance? Please contact the hiring manager.
           </p>
 
           {managers.map((mgr) => (
