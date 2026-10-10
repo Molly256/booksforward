@@ -2,7 +2,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 import { Redis } from '@upstash/redis';
 import { NextResponse } from 'next/server';
-import booksData from '../../data.js'; // FIX: static import for Vercel
+import * as dataModule from '../../data.js';
+const booksData = dataModule.default || dataModule.books || dataModule.data || dataModule.allBooks || dataModule;
 
 const redis = Redis.fromEnv();
 const P = 'bf:';
@@ -17,19 +18,19 @@ export const VIPS = {
 let CACHED_VALID_BOOKS = null;
 function getValidBooksCached(){
   if(CACHED_VALID_BOOKS) return CACHED_VALID_BOOKS;
-  // Vercel-safe loading from imported module
-  let allBooks = booksData?.default || booksData?.books || booksData;
-  if(!Array.isArray(allBooks)) allBooks = [];
-
-  // Fallback so it NEVER returns [] - always seeds on Mon-Sat
+  let allBooks = booksData?.default || booksData?.books || booksData?.data || booksData;
+  if(!Array.isArray(allBooks)){
+    // if booksData itself is the object with named exports
+    if(Array.isArray(dataModule.books)) allBooks = dataModule.books;
+    else if(Array.isArray(dataModule.data)) allBooks = dataModule.data;
+    else allBooks = [];
+  }
   if(allBooks.length === 0){
     allBooks = Array.from({length: 100}, (_,i)=>({id:`book_${i+1}`, _id:`book_${i+1}`, title:`Book ${i+1}`}));
   }
-
   CACHED_VALID_BOOKS = allBooks;
   return allBooks;
 }
-
 function pickRandomBooks(count){
   const pool=getValidBooksCached();
   if(!pool.length) return [];
@@ -42,7 +43,6 @@ function pickRandomBooks(count){
 }
 const getUgandaDateString=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Kampala'});
 const getUgandaDateTimeString=()=>new Date().toLocaleString("en-CA",{timeZone:"Africa/Kampala",hour12:false}).slice(0,16).replace(',',' ');
-
 function assignBooksToUser(phone,vipLevel,today,pipeline){
   const selectedVip=VIPS[vipLevel];
   const validBooks=pickRandomBooks(selectedVip.books);
@@ -57,7 +57,6 @@ function assignBooksToUser(phone,vipLevel,today,pipeline){
     assignedBooksMeta:validBooks.map(b=>({id:String(b.id||b._id),title:b.title,cover:'/books/covers/'+String(b.id||b._id)+'.jpg',reward:selectedVip.perBook}))
   };
 }
-
 export async function GET(req){
   try{
     const {searchParams}=new URL(req.url);const phone=searchParams.get('phone');
@@ -67,7 +66,6 @@ export async function GET(req){
     return NextResponse.json({success:true,user,pool:getValidBooksCached().length});
   }catch(err){return NextResponse.json({success:false,message:err.message},{status:500});}
 }
-
 export async function POST(req){
   try{
     const body=await req.json(),phone=body.phone,action=body.action,payload=body.payload;
