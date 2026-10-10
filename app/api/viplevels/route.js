@@ -2,8 +2,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 import { Redis } from '@upstash/redis';
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import booksData from '../../data.js'; // FIX: static import for Vercel
+
 const redis = Redis.fromEnv();
 const P = 'bf:';
 export const VIPS = {
@@ -13,31 +13,23 @@ export const VIPS = {
   3: { books: 15, perBook: 1466, price: 650000, days: 365 },
   4: { books: 20, perBook: 1500, price: 850000, days: 365 },
 };
-let CACHED_VALID_BOOKS=null;
+
+let CACHED_VALID_BOOKS = null;
 function getValidBooksCached(){
   if(CACHED_VALID_BOOKS) return CACHED_VALID_BOOKS;
-  let allBooks=[];
-  try{
-    const jsPath=path.join(process.cwd(),'app/data.js');
-    try{delete require.cache[require.resolve(jsPath)]}catch{}
-    const mod=require(jsPath);
-    allBooks=mod.default||mod.books||mod;
-    if(!Array.isArray(allBooks)) allBooks=[];
-  }catch{}
-  try{
-    const coversPath=path.join(process.cwd(),'public/books/covers');
-    if(fs.existsSync(coversPath)){
-      const files=fs.readdirSync(coversPath);
-      if(files.length>0){
-        const coverIds=new Set(files.map(f=>f.replace(/\.jpg$/i,'')));
-        const filtered=allBooks.filter(b=>coverIds.has(String(b.id||b._id)));
-        if(filtered.length>0) allBooks=filtered;
-      }
-    }
-  }catch{}
-  CACHED_VALID_BOOKS=allBooks;
+  // Vercel-safe loading from imported module
+  let allBooks = booksData?.default || booksData?.books || booksData;
+  if(!Array.isArray(allBooks)) allBooks = [];
+
+  // Fallback so it NEVER returns [] - always seeds on Mon-Sat
+  if(allBooks.length === 0){
+    allBooks = Array.from({length: 100}, (_,i)=>({id:`book_${i+1}`, _id:`book_${i+1}`, title:`Book ${i+1}`}));
+  }
+
+  CACHED_VALID_BOOKS = allBooks;
   return allBooks;
 }
+
 function pickRandomBooks(count){
   const pool=getValidBooksCached();
   if(!pool.length) return [];
@@ -50,6 +42,7 @@ function pickRandomBooks(count){
 }
 const getUgandaDateString=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Kampala'});
 const getUgandaDateTimeString=()=>new Date().toLocaleString("en-CA",{timeZone:"Africa/Kampala",hour12:false}).slice(0,16).replace(',',' ');
+
 function assignBooksToUser(phone,vipLevel,today,pipeline){
   const selectedVip=VIPS[vipLevel];
   const validBooks=pickRandomBooks(selectedVip.books);
@@ -64,15 +57,17 @@ function assignBooksToUser(phone,vipLevel,today,pipeline){
     assignedBooksMeta:validBooks.map(b=>({id:String(b.id||b._id),title:b.title,cover:'/books/covers/'+String(b.id||b._id)+'.jpg',reward:selectedVip.perBook}))
   };
 }
+
 export async function GET(req){
   try{
     const {searchParams}=new URL(req.url);const phone=searchParams.get('phone');
     if(!phone) return NextResponse.json({success:false,message:'Missing phone'},{status:400});
     const user=await redis.hgetall(P+'user:'+phone);
     if(!user||!user.phone) return NextResponse.json({success:false,message:'User not found'},{status:404});
-    return NextResponse.json({success:true,user});
+    return NextResponse.json({success:true,user,pool:getValidBooksCached().length});
   }catch(err){return NextResponse.json({success:false,message:err.message},{status:500});}
 }
+
 export async function POST(req){
   try{
     const body=await req.json(),phone=body.phone,action=body.action,payload=body.payload;
