@@ -63,30 +63,32 @@ export default function Dashboard() {
       minHeight: '100vh', 
       backgroundImage: "url('/book.jpg')",
       backgroundSize: 'cover',
-      backgroundPosition: 'center',
+      backgroundPosition: 'center top',
       backgroundRepeat: 'no-repeat',
-      backgroundAttachment: 'fixed',
-      position:'relative' 
+      position:'relative',
+      paddingBottom: '90px'
     }}>
       
-      <div style={{
-        width: '100vw',
-        marginLeft: 'calc(-50vw + 50%)',
-        height: '260px',
-        overflow: 'hidden',
-        background: '#fff',
-        marginBottom: '16px'
+      {/* TOP SPACER - lets BOOKSFORWARD 3D text show */}
+      <div style={{ height: '32vh', minHeight: '220px' }} />
+
+      {/* BUTTONS BOX - sits in the exact middle grass area you drew in pink */}
+      <main style={{ 
+        background: 'transparent', 
+        padding: '0 12px', 
+        maxWidth:'480px', 
+        margin:'0 auto' 
       }}>
-        <img
-          src="/book.jpg"
-          alt="BooksForward Banner"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display:'block' }}
-        />
-      </div>
 
-      <main style={{ background: '#FFFFFF', padding: '0 10px 110px', maxWidth:'480px', margin:'0 auto' }}>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(4, 1fr)', 
+          gap: '10px',
+          background: 'rgba(255,255,255,0.15)',
+          backdropFilter: 'blur(2px)',
+          padding: '14px 10px',
+          borderRadius: '18px'
+        }}>
           {menuItems.map(item => (
             <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{ textAlign: 'center' }}>
@@ -99,11 +101,12 @@ export default function Dashboard() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '26px',
-                  boxShadow: '0 4px 10px rgba(0,200,83,0.35)',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.25)',
+                  border: '1.5px solid #fff'
                 }}>
                   {item.icon}
                 </div>
-                <p style={{ margin: '6px 0 0', fontSize: '9.5px', fontWeight: '800', color: '#111', lineHeight:'1.1' }}>
+                <p style={{ margin: '6px 0 0', fontSize: '9px', fontWeight: '900', color: '#fff', lineHeight:'1.1', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
                   {item.label}
                 </p>
               </div>
@@ -122,6 +125,9 @@ export default function Dashboard() {
         )}
 
       </main>
+
+      {/* BOTTOM SPACER - lets bottom flowers show */}
+      <div style={{ height: '18vh' }} />
 
       <Link href="/manager" style={{ textDecoration:'none' }}>
         <div style={{
