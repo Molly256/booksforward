@@ -61,26 +61,14 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: '#FFFFFF', position:'relative' }}>
       
-      <h1 style={{
-        margin: '0',
-        padding: '15px 0 12px',
-        fontSize: '30px',
-        fontWeight: '900',
-        color: HOT_GREEN,
-        textAlign: 'center',
-        letterSpacing: '1.5px',
-        background: '#FFFFFF'
-      }}>
-        BOOKSFORWARD
-      </h1>
-
+      {/* IMAGE FULL FROM TOP - NO HEADER */}
       <div style={{
         width: '100vw',
         marginLeft: 'calc(-50vw + 50%)',
-        height: '210px',
+        height: '260px',
         overflow: 'hidden',
         background: '#fff',
-        marginBottom: '22px'
+        marginBottom: '16px'
       }}>
         <img
           src="/book.jpg"
@@ -89,45 +77,39 @@ export default function Dashboard() {
         />
       </div>
 
-      <main style={{ background: '#FFFFFF', padding: '0 16px 110px', maxWidth:'480px', margin:'0 auto' }}>
+      <main style={{ background: '#FFFFFF', padding: '0 10px 110px', maxWidth:'480px', margin:'0 auto' }}>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
+        {/* 4 PER ROW - 2 LINES - VERY SMALL SIZE */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
           {menuItems.map(item => (
             <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{ textAlign: 'center' }}>
-                {/* OPEN BOOK BUTTON - SAME COLORED EMOJI */}
                 <div style={{
                   width: '100%',
-                  height: '125px',
+                  height: '62px',
                   position: 'relative',
-                  filter: 'drop-shadow(0 6px 12px rgba(0,200,83,0.35))',
+                  filter: 'drop-shadow(0 3px 6px rgba(0,200,83,0.35))',
                 }}>
                   <svg viewBox="0 0 200 135" width="100%" height="100%" style={{ display:'block' }}>
-                    {/* book thickness bottom */}
                     <path d="M10 20 C 55 6, 100 9, 100 9 C 100 9, 145 6, 190 20 L 190 115 C 145 101, 100 104, 100 104 C 100 104, 55 101, 10 115 Z" fill="#0A8F3A" />
-                    {/* hot green cover */}
                     <path d="M12 18 C 55 4, 99 7, 100 7 C 101 7, 145 4, 188 18 L 188 108 C 145 94, 101 97, 100 97 C 99 97, 55 94, 12 108 Z" fill={HOT_GREEN} />
-                    {/* left page highlight */}
                     <path d="M14 22 C 50 12, 90 13, 98 14 L 98 92 C 90 92, 50 91, 14 101 Z" fill="#FFFFFF" opacity="0.12" />
-                    {/* right page highlight */}
                     <path d="M102 14 C 110 13, 150 12, 186 22 L 186 101 C 150 91, 110 92, 102 92 Z" fill="#FFFFFF" opacity="0.12" />
-                    {/* spine line */}
                     <path d="M100 7 L 100 97" stroke="#075E26" strokeWidth="1.5" opacity="0.35" />
                   </svg>
-                  {/* SAME COLORED EMOJI ON TOP */}
                   <div style={{
                     position: 'absolute',
                     inset: 0,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '42px',
-                    paddingBottom: '6px'
+                    fontSize: '22px',
+                    paddingBottom: '4px'
                   }}>
                     {item.icon}
                   </div>
                 </div>
-                <p style={{ margin: '8px 0 0', fontSize: '13px', fontWeight: '800', color: '#111' }}>
+                <p style={{ margin: '4px 0 0', fontSize: '9.5px', fontWeight: '800', color: '#111', lineHeight:'1.1' }}>
                   {item.label}
                 </p>
               </div>
@@ -137,11 +119,11 @@ export default function Dashboard() {
 
         {isAdmin && (
           <div onClick={() => router.push('/admin')} style={{
-            marginTop:'18px', width:'100%', height:'95px', background:'#111', borderRadius:'18px',
+            marginTop:'18px', width:'100%', height:'75px', background:'#111', borderRadius:'14px',
             display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-            fontSize:'32px', color:'#fff', cursor:'pointer', border:`2px solid ${HOT_GREEN}`
+            fontSize:'26px', color:'#fff', cursor:'pointer', border:`2px solid ${HOT_GREEN}`
           }}>
-            🔐 <span style={{fontSize:'13px', fontWeight:'900', marginTop:'4px'}}>Admin Panel</span>
+            🔐 <span style={{fontSize:'11px', fontWeight:'900', marginTop:'4px'}}>Admin Panel</span>
           </div>
         )}
 
@@ -152,14 +134,14 @@ export default function Dashboard() {
           position: 'fixed',
           bottom: '88px',
           right: '18px',
-          width: '58px',
-          height: '58px',
+          width: '52px',
+          height: '52px',
           background: HOT_GREEN,
           borderRadius: '50%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '26px',
+          fontSize: '22px',
           color: '#fff',
           boxShadow: '0 6px 18px rgba(0,0,0,0.25)',
           zIndex: 9999,
