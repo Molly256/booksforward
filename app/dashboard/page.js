@@ -61,7 +61,6 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: '#FFFFFF', position:'relative' }}>
       
-      {/* IMAGE FULL FROM TOP - NO HEADER */}
       <div style={{
         width: '100vw',
         marginLeft: 'calc(-50vw + 50%)',
@@ -79,37 +78,24 @@ export default function Dashboard() {
 
       <main style={{ background: '#FFFFFF', padding: '0 10px 110px', maxWidth:'480px', margin:'0 auto' }}>
 
-        {/* 4 PER ROW - 2 LINES - VERY SMALL SIZE */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
           {menuItems.map(item => (
             <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{
                   width: '100%',
-                  height: '62px',
-                  position: 'relative',
-                  filter: 'drop-shadow(0 3px 6px rgba(0,200,83,0.35))',
+                  aspectRatio: '1',
+                  background: HOT_GREEN,
+                  borderRadius: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '26px',
+                  boxShadow: '0 4px 10px rgba(0,200,83,0.35)',
                 }}>
-                  <svg viewBox="0 0 200 135" width="100%" height="100%" style={{ display:'block' }}>
-                    <path d="M10 20 C 55 6, 100 9, 100 9 C 100 9, 145 6, 190 20 L 190 115 C 145 101, 100 104, 100 104 C 100 104, 55 101, 10 115 Z" fill="#0A8F3A" />
-                    <path d="M12 18 C 55 4, 99 7, 100 7 C 101 7, 145 4, 188 18 L 188 108 C 145 94, 101 97, 100 97 C 99 97, 55 94, 12 108 Z" fill={HOT_GREEN} />
-                    <path d="M14 22 C 50 12, 90 13, 98 14 L 98 92 C 90 92, 50 91, 14 101 Z" fill="#FFFFFF" opacity="0.12" />
-                    <path d="M102 14 C 110 13, 150 12, 186 22 L 186 101 C 150 91, 110 92, 102 92 Z" fill="#FFFFFF" opacity="0.12" />
-                    <path d="M100 7 L 100 97" stroke="#075E26" strokeWidth="1.5" opacity="0.35" />
-                  </svg>
-                  <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '22px',
-                    paddingBottom: '4px'
-                  }}>
-                    {item.icon}
-                  </div>
+                  {item.icon}
                 </div>
-                <p style={{ margin: '4px 0 0', fontSize: '9.5px', fontWeight: '800', color: '#111', lineHeight:'1.1' }}>
+                <p style={{ margin: '6px 0 0', fontSize: '9.5px', fontWeight: '800', color: '#111', lineHeight:'1.1' }}>
                   {item.label}
                 </p>
               </div>
