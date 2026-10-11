@@ -35,17 +35,16 @@ function safeParse(str, fallback = []) {
 export async function POST(request) {
   try {
     const { phone, bookId, action, bookTitle: realTitleFromFront } = await request.json();
-
     if (!phone ||!bookId ||!action) {
       return NextResponse.json({ error: 'Missing phone, bookId, or action' }, { status: 400 });
     }
-
     const today = getUgandaDateString();
     const bookKey = `bf:book:${phone}:${today}:${bookId}`;
     const userKey = `bf:user:${phone}`;
     const txKey = `bf:tx:${phone}:${today}`;
     const historyKey = `bf:tx:${phone}:history`;
     const incomeKey = `bf:income:${phone}:${today}`;
+    const setKey = `bf:books:${phone}:${today}`;
 
     const userData = await redis.hgetall(userKey);
     if (!userData ||!userData.phone) {
@@ -53,6 +52,19 @@ export async function POST(request) {
     }
 
     if (action === 'read') {
+      // FIX: block reading new book if another book is already read but not submitted - per phone per day
+      const bookIds = await redis.smembers(setKey);
+      if (bookIds?.length) {
+        const pipeline = redis.pipeline();
+        bookIds.forEach(id => {
+          const clean = String(id).trim();
+          if (clean!== String(bookId).trim()) pipeline.hget(`bf:book:${phone}:${today}:${clean}`, 'status');
+        });
+        const statuses = await pipeline.exec();
+        if (statuses.some(s => s === 'read')) {
+          return NextResponse.json({ error: 'still have a pending submission' }, { status: 400 });
+        }
+      }
       const currentStatus = await redis.hget(bookKey, 'status') || null;
       if (currentStatus === 'submitted') return NextResponse.json({ success: true, status: 'submitted' });
       await redis.hset(bookKey, { status: 'read', readAt: new Date().toISOString() });
@@ -67,42 +79,26 @@ export async function POST(request) {
       if (currentStatus!== 'read') {
         return NextResponse.json({ error: 'Book must be read before submitting' }, { status: 400 });
       }
-
       const vipLevel = Number(userData.vip || 0);
       const vipData = VIPS[vipLevel];
       if (!vipData) return NextResponse.json({ error: 'VIP level configuration not open' }, { status: 403 });
-
       const payout = vipData.perBook;
       const currentCompleted = safeParse(userData.completedBooks);
       if (!currentCompleted.includes(String(bookId))) currentCompleted.push(String(bookId));
-
-      // GET REAL BOOK TITLE from bookKey or frontend
       let finalTitle = realTitleFromFront;
       if (!finalTitle) {
         const bookInfo = await redis.hgetall(bookKey);
         finalTitle = bookInfo?.title || bookInfo?.bookTitle || `Book ${bookId}`;
       }
-
       const ugDateTime = getUgandaDateTime();
-
       const tx = {
-        id: makeId(),
-        type: 'daily income', // ONLY daily income goes to task history
-        label: 'Daily Income',
-        amount: String(payout),
-        status: 'Success',
-        createdAt: ugDateTime,
-        phone: phone,
-        vipLevel: String(vipLevel),
-        bookTitle: finalTitle, // REAL TITLE NOW!
-        title: finalTitle,
-        bookId: String(bookId)
+        id: makeId(), type: 'daily income', label: 'Daily Income',
+        amount: String(payout), status: 'Success', createdAt: ugDateTime,
+        phone: phone, vipLevel: String(vipLevel), bookTitle: finalTitle, title: finalTitle, bookId: String(bookId)
       };
-
       const updatedBalance = Number(userData.availableBalance || 0) + payout;
       const nextDailyCount = Number(userData.books_read_today || 0) + 1;
       const nextDailyIncome = Number(userData.dailyIncome || 0) + payout;
-
       await redis.hset(bookKey, { status: 'submitted', submittedAt: new Date().toISOString() });
       await redis.hset(userKey, {
         availableBalance: String(updatedBalance),
@@ -110,22 +106,16 @@ export async function POST(request) {
         dailyIncome: String(nextDailyIncome),
         completedBooks: JSON.stringify(currentCompleted)
       });
-
       const txString = JSON.stringify(tx);
       await redis.lpush(txKey, txString);
       await redis.lpush(historyKey, txString);
       await redis.lpush(incomeKey, txString);
       await redis.persist(historyKey);
-
       return NextResponse.json({
-        success: true,
-        availableBalance: updatedBalance,
-        status: 'submitted',
-        books_read_today: nextDailyCount,
-        completedBooks: currentCompleted
+        success: true, availableBalance: updatedBalance, status: 'submitted',
+        books_read_today: nextDailyCount, completedBooks: currentCompleted
       });
     }
-
     return NextResponse.json({ error: 'Invalid action specified' }, { status: 400 })
   } catch (error) {
     console.error('API /books/submit Error:', error)

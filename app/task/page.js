@@ -34,13 +34,10 @@ export default function TaskPage() {
         }))
         setBooks(mergedBooks)
       }
-      // HISTORY - MERGE SERVER + LOCAL, DON'T OVERWRITE - FIXED TO KEEP ALL MONTHS
       const histRes = await fetch(`/api/books/history?phone=${phone}&_t=${Date.now()}`, { cache: 'no-store' })
       const histJson = await histRes.json()
       const serverHistory = histJson.success ? (histJson.history || []) : []
-      
       const localHistory = JSON.parse(localStorage.getItem(`task_history_${phone}`) || '[]')
-      
       const merged = [...serverHistory, ...localHistory]
       const unique = []
       const seen = new Set()
@@ -52,7 +49,6 @@ export default function TaskPage() {
         }
       }
       unique.sort((a,b) => String(b.completedAt||'').localeCompare(String(a.completedAt||'')))
-      
       setHistory(unique)
       if (unique.length > 0) {
         localStorage.setItem(`task_history_${phone}`, JSON.stringify(unique))
@@ -73,7 +69,6 @@ export default function TaskPage() {
     setUser(userData)
     const localHistory = JSON.parse(localStorage.getItem(`task_history_${userData.phone}`) || '[]')
     if (localHistory.length > 0) setHistory(localHistory)
-    
     fetchBooks(userData.phone)
   }, [])
 
@@ -94,30 +89,45 @@ export default function TaskPage() {
   }
 
   const handleRead = (book) => {
-    const currentlyReading = localStorage.getItem('currentlyReading')
-    const completedRead = JSON.parse(localStorage.getItem('completedRead') || '[]')
+    const phone = user?.phone
+    if (!phone) return
+    const today = getUgandaDateString()
+    const currKey = `currentlyReading_${phone}_${today}`
+    const compKey = `completedRead_${phone}_${today}`
+
+    const currentlyReading = localStorage.getItem(currKey)
+    const completedRead = JSON.parse(localStorage.getItem(compKey) || '[]')
+
+    // If already reading a different book (preview open but not finished)
     if (currentlyReading && currentlyReading !== String(book.bookId)) {
       showToastMsg('still have a pending reading'); return
     }
+    // If 1 book finished reading but not submitted, block reading another book
     if (completedRead.length > 0 && !completedRead.includes(String(book.bookId))) {
       showToastMsg('still have a pending submission'); return
     }
-    if (completedRead.includes(String(book.bookId))) {
-      showToastMsg('still have a pending submission'); return
-    }
-    if (book.status !== 'pending') return
-    localStorage.setItem('currentlyReading', String(book.bookId))
+    // If same book already pending submission, allow re-open? No, already read, should submit
+    // Keep status check: only pending books can be opened, unless it's the completed one
+    if (book.status !== 'pending' && !completedRead.includes(String(book.bookId))) return
+
+    localStorage.setItem(currKey, String(book.bookId))
     setReadingBook(book)
     setTimer(15)
     setFinished(false)
   }
 
   const handlePinkPlate = () => {
-    localStorage.removeItem('currentlyReading')
-    const completed = JSON.parse(localStorage.getItem('completedRead') || '[]')
+    const phone = user?.phone
+    if (!phone) return
+    const today = getUgandaDateString()
+    const currKey = `currentlyReading_${phone}_${today}`
+    const compKey = `completedRead_${phone}_${today}`
+
+    localStorage.removeItem(currKey)
+    const completed = JSON.parse(localStorage.getItem(compKey) || '[]')
     if(!completed.includes(String(readingBook.bookId))){
       completed.push(String(readingBook.bookId))
-      localStorage.setItem('completedRead', JSON.stringify(completed))
+      localStorage.setItem(compKey, JSON.stringify(completed))
     }
     if(user?.phone){
       fetch('/api/books/submit', {
@@ -133,7 +143,13 @@ export default function TaskPage() {
   }
 
   const handleSubmit = async (book) => {
-    const completedRead = JSON.parse(localStorage.getItem('completedRead') || '[]')
+    const phone = user?.phone
+    if (!phone) return
+    const today = getUgandaDateString()
+    const currKey = `currentlyReading_${phone}_${today}`
+    const compKey = `completedRead_${phone}_${today}`
+
+    const completedRead = JSON.parse(localStorage.getItem(compKey) || '[]')
     if (!completedRead.includes(String(book.bookId)) && book.status !== 'read') {
       return showToastMsg('Finish reading first')
     }
@@ -160,8 +176,8 @@ export default function TaskPage() {
       setUser(newUser)
       localStorage.setItem('booksforward_user', JSON.stringify(newUser))
       const newCompleted = completedRead.filter(id=> String(id) !== String(book.bookId))
-      localStorage.setItem('completedRead', JSON.stringify(newCompleted))
-      localStorage.removeItem('currentlyReading')
+      localStorage.setItem(compKey, JSON.stringify(newCompleted))
+      localStorage.removeItem(currKey)
 
       const newHistoryItem = {
         id: String(book.bookId) + '-' + Date.now(),
@@ -197,6 +213,12 @@ export default function TaskPage() {
   }
 
   const handleClosePreviewWithoutFinishing = () => {
+    const phone = user?.phone
+    if (phone) {
+      const today = getUgandaDateString()
+      const currKey = `currentlyReading_${phone}_${today}`
+      localStorage.removeItem(currKey)
+    }
     setReadingBook(null)
     setTimer(15)
     setFinished(false)
@@ -204,7 +226,12 @@ export default function TaskPage() {
 
   if (!user) return null
   const vip = Number(user.vip || 0)
-  const completedReadLS = typeof window!== 'undefined'? JSON.parse(localStorage.getItem('completedRead') || '[]') : []
+  const getCompletedLS = () => {
+    if (typeof window === 'undefined' || !user?.phone) return []
+    const today = getUgandaDateString()
+    return JSON.parse(localStorage.getItem(`completedRead_${user.phone}_${today}`) || '[]')
+  }
+  const completedReadLS = getCompletedLS()
   const pendingBooks = books.filter(b=> b.status === 'pending' || b.status === 'read')
   const HOT_GREEN = '#00C853'
   const LIGHT_GREEN = '#E8F5E9'
