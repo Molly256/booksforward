@@ -59,7 +59,15 @@ export default function Dashboard() {
   if (loading) return <div style={{padding:'40px', textAlign:'center', background:'#fff'}}>Loading...</div>
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FFFFFF', position:'relative' }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      backgroundImage: "url('/book.jpg')",
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      backgroundAttachment: 'fixed',
+      position:'relative' 
+    }}>
       
       <div style={{
         width: '100vw',
