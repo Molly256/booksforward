@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
+const HOT_GREEN = '#00C853'
 
 export default function TeamPage() {
   const [data, setData] = useState(null)
@@ -15,13 +16,13 @@ export default function TeamPage() {
       window.location.href = '/login'
       return
     }
-    fetch('/api/team?phone=' + userData.phone)
-.then(function(r) { return r.json() })
-.then(function(res) {
+    fetch('/api/team?phone=' + userData.phone + '&_t=' + Date.now(), { cache: 'no-store' })
+     .then(function(r) { return r.json() })
+     .then(function(res) {
         if (res.success) setData(res)
         setLoading(false)
       })
-.catch(function() { setLoading(false) })
+     .catch(function() { setLoading(false) })
   }, [])
 
   if (!data &&!loading) return <div className="min-h-screen flex items-center justify-center">No data</div>
@@ -30,14 +31,14 @@ export default function TeamPage() {
   const teamBList = data?.listB || []
   const teamCList = data?.listC || []
 
+  // FRESH COMMISSION - from transactions history (team commission) = old + new as one big number
   let displayCommission = 0
   if (data?.transactions && Array.isArray(data.transactions)) {
-    displayCommission = data.transactions
-.filter(function(tx){
-        const t = String(tx.type || tx.txType || '').toLowerCase()
-        return t.startsWith('bf') && t.includes('commission')
-      })
-.reduce(function(s, tx){ return s + Number(tx.amount || 0) }, 0)
+    const commissionTx = data.transactions.filter(function(tx){
+      const t = String(tx.type || tx.txType || tx.label || '').toLowerCase()
+      return t.includes('commission') || t.includes('referral') || t.includes('team')
+    })
+    displayCommission = commissionTx.reduce(function(s, tx){ return s + Number(tx.amount || 0) }, 0)
     if (displayCommission === 0) {
       displayCommission = data.teamCommissionTotal!== undefined? Number(data.teamCommissionTotal) : Number(data.total || 0)
     }
@@ -52,21 +53,21 @@ export default function TeamPage() {
     return []
   }
 
+  // FIXED: return digit only 0 1 2 3 4
   const formatVip = function(raw) {
-    const v = String(raw || '').toLowerCase().trim()
-    if (v === '0' || v === '') return 'vip0'
-    if (['vip0','vip1','vip2','vip3','vip4','0','1','2','3','4'].includes(v)) {
-      if (v.length === 1) return 'vip' + v
-      return v
-    }
-    return 'vip0'
+    if (raw === null || raw === undefined) return '0'
+    const s = String(raw).toLowerCase().trim()
+    const m = s.match(/[0-4]/)
+    if (m) return m[0]
+    if (s === 'vip0' || s === 'vip1' || s === 'vip2' || s === 'vip3' || s === 'vip4') return s.replace('vip','')
+    return '0'
   }
 
   return (
     <main className="min-h-screen bg-gray-50">
       <div style={{
         width:'100%',
-        background:'#00C853',
+        background:HOT_GREEN,
         padding:'14px 20px',
         display:'flex',
         alignItems:'center',
@@ -86,10 +87,11 @@ export default function TeamPage() {
       </div>
 
       <div className="max-w-2xl mx-auto p-4">
-        <div className="rounded-2xl shadow-md p-6 mb-6" style={{background:'#00C853'}}>
-          <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{color:'#000'}}>Commission from Team</p>
+        {/* REMOVED GREEN BOX - NOW WHITE, SUBHEADER HOT GREEN, AMOUNT BOLD BLACK UGX */}
+        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6 mb-6">
+          <p className="text-xs font-black uppercase tracking-wider mb-2" style={{color:HOT_GREEN}}>COMMISSION FROM TEAM</p>
           <p className="text-3xl font-black" style={{color:'#000'}}>
-            {loading? '...' : displayCommission.toLocaleString() + ' shs'}
+            {loading? '...' : `UGX ${displayCommission.toLocaleString()}`}
           </p>
         </div>
 
@@ -107,29 +109,27 @@ export default function TeamPage() {
                     <p className="text-[10px] font-bold text-gray-600">{teamAList.length} Members</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <p className="text-xl font-black text-[#00C853]">{teamAList.length}</p>
+                    <p className="text-xl font-black" style={{color:HOT_GREEN}}>{teamAList.length}</p>
                     <span className="text-gray-300">›</span>
                   </div>
                 </button>
-
                 <button type="button" onClick={function() { setSelectedTeam('B') }} className="rounded-xl border p-4 flex justify-between items-center outline-none cursor-pointer bg-white border-gray-100">
                   <div className="text-left">
                     <p className="text-xs font-bold uppercase text-gray-400">TEAM B</p>
                     <p className="text-[10px] font-bold text-gray-600">{teamBList.length} Members</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <p className="text-xl font-black text-[#00C853]">{teamBList.length}</p>
+                    <p className="text-xl font-black" style={{color:HOT_GREEN}}>{teamBList.length}</p>
                     <span className="text-gray-300">›</span>
                   </div>
                 </button>
-
                 <button type="button" onClick={function() { setSelectedTeam('C') }} className="rounded-xl border p-4 flex justify-between items-center outline-none cursor-pointer bg-white border-gray-100">
                   <div className="text-left">
                     <p className="text-xs font-bold uppercase text-gray-400">TEAM C</p>
                     <p className="text-[10px] font-bold text-gray-600">{teamCList.length} Members</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <p className="text-xl font-black text-[#00C853]">{teamCList.length}</p>
+                    <p className="text-xl font-black" style={{color:HOT_GREEN}}>{teamCList.length}</p>
                     <span className="text-gray-300">›</span>
                   </div>
                 </button>
@@ -142,16 +142,17 @@ export default function TeamPage() {
                   Team {selectedTeam} Members ({getActiveList(selectedTeam).length})
                 </h3>
                 {getActiveList(selectedTeam).length > 0? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  /* FIXED: LIST NOT SIDE BY SIDE, STANDALONE NUMBERS NO GREY BOX */
+                  <div className="flex flex-col divide-y divide-gray-100">
                     {getActiveList(selectedTeam).map(function(member) {
                       const isObject = member && typeof member === 'object'
                       const phoneNum = isObject? member.phone : member
                       const rawVip = isObject? (member.vip || member.vipLevel || member.level || '') : ''
-                      const vipLabel = formatVip(rawVip)
+                      const vipDigit = formatVip(rawVip)
                       return (
-                        <div key={phoneNum} className="bg-gray-50 border border-gray-100 text-gray-700 text-xs font-bold py-2.5 px-3 rounded-lg text-center flex items-center justify-center gap-2">
-                          <span>{phoneNum}</span>
-                          <span className="text-[10px] font-black lowercase">{vipLabel}</span>
+                        <div key={phoneNum} className="flex justify-between items-center py-3 px-1">
+                          <span className="text-[13px] font-bold text-gray-800 tracking-wide">{phoneNum}</span>
+                          <span className="text-[13px] font-black text-gray-900 w-6 h-6 flex items-center justify-center rounded-full bg-gray-50 border">{vipDigit}</span>
                         </div>
                       )
                     })}

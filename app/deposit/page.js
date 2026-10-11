@@ -90,7 +90,7 @@ export default function Deposit() {
         return
       }
 
-      showToast('Deposit request submitted. Wait for approval.', 'success')
+      showToast('Deposit request submitted successfully.', 'success')
       setTimeout(() => router.push('/transactions'), 800)
 
     } catch (err) {
