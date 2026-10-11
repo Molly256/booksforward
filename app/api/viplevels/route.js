@@ -34,6 +34,10 @@ function pickRandomBooks(count){
 }
 const getUgandaDateString=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Kampala'});
 const getUgandaDateTimeString=()=>new Date().toLocaleString("en-CA",{timeZone:"Africa/Kampala",hour12:false}).slice(0,16).replace(',',' ');
+function getUgandaDay(){
+  // 0 = Sunday, 1-6 = Mon-Sat (Uganda time)
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" })).getDay();
+}
 function assignBooksToUser(phone,vipLevel,today,pipeline){
   const selectedVip=VIPS[vipLevel];
   const validBooks=pickRandomBooks(selectedVip.books);
@@ -66,8 +70,12 @@ export async function POST(req){
     const userKey=P+'user:'+phone,user=await redis.hgetall(userKey);
     if(!user||!user.phone) return NextResponse.json({success:false,message:'User not found'},{status:404});
     const dateStr=getUgandaDateString(),timeStr=getUgandaDateTimeString(),historyKey=P+'tx:'+phone+':history';
+    const ugandaDay=getUgandaDay();
+    const isSunday=ugandaDay===0;
+
     const pipeline=redis.pipeline();let unlockedBooksArr=[],assignedBooksMetaArr=[];
     if(vipLevel===0){
+      // VIP0 - ALWAYS SEED EVEN ON SUNDAY - NO LIMIT
       if(user.vipActivated==='true'||user.vipActivated===true) return NextResponse.json({success:false,message:'Vip0 already activated'},{status:400});
       if(Number(user.vip||0)>0&&(user.hasBoughtVip==='true'||user.hasBoughtVip===true)) return NextResponse.json({success:false,message:"Can't downgrade"},{status:400});
       const assignResult=assignBooksToUser(phone,0,dateStr,pipeline);
@@ -85,18 +93,48 @@ export async function POST(req){
       const isFirst=user.hasBoughtVip!=='true'&&user.hasBoughtVip!==true;
       pipeline.hincrby(userKey,'availableBalance',-tierCost);
       if(user.balance) pipeline.hincrby(userKey,'balance',-tierCost);
-      // ALWAYS SEED - Sunday check removed
-      const assignResult=assignBooksToUser(phone,vipLevel,dateStr,pipeline);
-      unlockedBooksArr=assignResult.unlockedBooks;assignedBooksMetaArr=assignResult.assignedBooksMeta;
+
+      if(isSunday){
+        // SUNDAY - VIP 1-4 UPGRADE: NO BOOK SEEDING
+        console.log(`⛔ Sunday Uganda - VIP${vipLevel} upgrade for ${phone} - NO books seeded`);
+        unlockedBooksArr=[];
+        assignedBooksMetaArr=[];
+      }else{
+        // MON-SAT: SEED BOOKS NORMALLY
+        const assignResult=assignBooksToUser(phone,vipLevel,dateStr,pipeline);
+        unlockedBooksArr=assignResult.unlockedBooks;assignedBooksMetaArr=assignResult.assignedBooksMeta;
+      }
+
       pipeline.lpush(historyKey,JSON.stringify({id:'up_'+Date.now(),type:'upgrade_vip',amount:String(-tierCost),note:'Vip'+vipLevel+' Upgrade',status:'success',createdAt:timeStr}));
       pipeline.hincrby(userKey,'spins',1);
-      pipeline.hset(userKey,{vip:String(vipLevel),vipPricePaid:String(tierCost),hasBoughtVip:'true',vipActivated:'true',vipExpiry:new Date(Date.now()+31536000000).toISOString(),unlockedBooks:JSON.stringify(unlockedBooksArr),completedBooks:'[]',books_read_today:'0',dailyIncome:'0',lastResetDate:dateStr,vip_bought_date:dateStr});
+      pipeline.hset(userKey,{
+        vip:String(vipLevel),
+        vipPricePaid:String(tierCost),
+        hasBoughtVip:'true',
+        vipActivated:'true',
+        vipExpiry:new Date(Date.now()+31536000000).toISOString(),
+        unlockedBooks:JSON.stringify(unlockedBooksArr),
+        completedBooks:'[]',
+        books_read_today:'0',
+        dailyIncome:'0',
+        lastResetDate:dateStr,
+        vip_bought_date:dateStr
+      });
       await pipeline.exec();
       if(isFirst) await processHierarchicalCommissions(phone,vipLevel);
       const updatedUser=await redis.hgetall(userKey);
-      return NextResponse.json({success:true,message:`Successfully upgraded to VIP ${vipLevel}`,user:updatedUser,books:assignedBooksMetaArr});
+      return NextResponse.json({
+        success:true,
+        message: isSunday? `Upgraded to VIP ${vipLevel} - Books will be available tomorrow (No tasks on Sunday)` : `Successfully upgraded to VIP ${vipLevel}`,
+        user:updatedUser,
+        books:assignedBooksMetaArr,
+        sundayBlocked:isSunday
+      });
     }
-  }catch(err){return NextResponse.json({success:false,message:err.message},{status:500});}
+  }catch(err){
+    console.error('VIP upgrade error:', err);
+    return NextResponse.json({success:false,message:err.message},{status:500});
+  }
 }
 async function processHierarchicalCommissions(buyerPhone,buyerVipLevel){
   try{
@@ -131,5 +169,5 @@ async function processHierarchicalCommissions(buyerPhone,buyerVipLevel){
       }
     }
     if(hasQueuedOps) await commissionPipeline.exec();
-  }catch(err){}
+  }catch(err){console.error('Commission error:', err);}
 }
