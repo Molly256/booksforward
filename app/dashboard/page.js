@@ -69,10 +69,10 @@ export default function Dashboard() {
       paddingBottom: '90px'
     }}>
       
-      {/* TOP SPACER - lets BOOKSFORWARD 3D text show */}
-      <div style={{ height: '32vh', minHeight: '220px' }} />
+      {/* TOP SPACER - bigger so BOOKSFORWARD text is fully seen */}
+      <div style={{ height: '42vh', minHeight: '310px' }} />
 
-      {/* BUTTONS BOX - sits in the exact middle grass area you drew in pink */}
+      {/* BUTTONS - standalone, no transparent bg */}
       <main style={{ 
         background: 'transparent', 
         padding: '0 12px', 
@@ -80,16 +80,47 @@ export default function Dashboard() {
         margin:'0 auto' 
       }}>
 
+        {/* FIRST ROW */}
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: 'repeat(4, 1fr)', 
-          gap: '10px',
-          background: 'rgba(255,255,255,0.15)',
-          backdropFilter: 'blur(2px)',
-          padding: '14px 10px',
-          borderRadius: '18px'
+          gap: '10px'
         }}>
-          {menuItems.map(item => (
+          {menuItems.slice(0,4).map(item => (
+            <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{
+                  width: '100%',
+                  aspectRatio: '1',
+                  background: HOT_GREEN,
+                  borderRadius: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '26px',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.25)',
+                  border: '1.5px solid #fff'
+                }}>
+                  {item.icon}
+                </div>
+                <p style={{ margin: '6px 0 0', fontSize: '9px', fontWeight: '900', color: '#fff', lineHeight:'1.1', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+                  {item.label}
+                </p>
+              </div>
+            </Link>
+          ))}
+        </div>
+
+        {/* GAP BETWEEN ROWS - keeps your drawn spacing */}
+        <div style={{ height: '24px' }} />
+
+        {/* SECOND ROW - in purple box you drew */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(4, 1fr)', 
+          gap: '10px'
+        }}>
+          {menuItems.slice(4,8).map(item => (
             <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{
@@ -126,8 +157,8 @@ export default function Dashboard() {
 
       </main>
 
-      {/* BOTTOM SPACER - lets bottom flowers show */}
-      <div style={{ height: '18vh' }} />
+      {/* BOTTOM GAP - your second purple box - flowers visible */}
+      <div style={{ height: '20vh', minHeight: '140px' }} />
 
       <Link href="/manager" style={{ textDecoration:'none' }}>
         <div style={{
