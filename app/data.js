@@ -900,3 +900,5 @@ export const books = [
     "category": "war"
   }
 ];
+export const BOOKS = books;
+export default books;
