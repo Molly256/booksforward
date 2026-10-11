@@ -69,10 +69,9 @@ export default function Dashboard() {
       paddingBottom: '90px'
     }}>
       
-      {/* TOP SPACER - bigger so BOOKSFORWARD text is fully seen */}
-      <div style={{ height: '42vh', minHeight: '310px' }} />
+      {/* TOP SPACER - pushed down so BOOKSFORWARD is fully seen */}
+      <div style={{ height: '52vh', minHeight: '390px' }} />
 
-      {/* BUTTONS - standalone, no transparent bg */}
       <main style={{ 
         background: 'transparent', 
         padding: '0 12px', 
@@ -80,7 +79,7 @@ export default function Dashboard() {
         margin:'0 auto' 
       }}>
 
-        {/* FIRST ROW */}
+        {/* FIRST ROW - NOW IN YOUR FIRST PINK BOX */}
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: 'repeat(4, 1fr)', 
@@ -111,10 +110,10 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* GAP BETWEEN ROWS - keeps your drawn spacing */}
-        <div style={{ height: '24px' }} />
+        {/* GAP - pushed to put second row in your second pink box */}
+        <div style={{ height: '85px' }} />
 
-        {/* SECOND ROW - in purple box you drew */}
+        {/* SECOND ROW - NOW IN YOUR SECOND PINK BOX (lower) */}
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: 'repeat(4, 1fr)', 
@@ -157,8 +156,8 @@ export default function Dashboard() {
 
       </main>
 
-      {/* BOTTOM GAP - your second purple box - flowers visible */}
-      <div style={{ height: '20vh', minHeight: '140px' }} />
+      {/* BOTTOM GAP - small now, flowers stay visible */}
+      <div style={{ height: '6vh', minHeight: '40px' }} />
 
       <Link href="/manager" style={{ textDecoration:'none' }}>
         <div style={{
