@@ -49,7 +49,6 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Phone already registered' }, { status: 400 })
       }
 
-      // CHECK IF INVITE CODE EXISTS IN REDIS - THIS WAS MISSING
       let directInviterPhone = await redis.get('bf:invite_code_map:' + referrerCode)
 
       if (!directInviterPhone) {
@@ -114,18 +113,36 @@ export async function POST(req) {
 
       pipeline.hset(userKey, userProfile)
       pipeline.set('bf:invite_code_map:' + inviteCode, String(phone).trim())
+      pipeline.set('bf:username_map:' + String(username).trim().toLowerCase(), String(phone).trim())
 
       await pipeline.exec()
       return NextResponse.json({ success: true, inviteCode: inviteCode })
     }
 
     if (action === 'login') {
-      if (!/^07\d{8}$/.test(phone) ||!password) {
+      if (!password) {
         return NextResponse.json({ error: 'Invalid phone or password' }, { status: 400 })
       }
 
-      const cleanPhone = String(phone).trim()
       const cleanPass = String(password).trim()
+      let cleanPhone = null
+
+      if (phone && /^07\d{8}$/.test(String(phone).trim())) {
+        cleanPhone = String(phone).trim()
+      } else if (username && String(username).trim()) {
+        const unameLower = String(username).trim().toLowerCase()
+        if (unameLower === 'admin256') {
+          cleanPhone = '0753520252'
+        } else {
+          const mapped = await redis.get('bf:username_map:' + unameLower)
+          if (!mapped) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 })
+          }
+          cleanPhone = String(mapped).trim()
+        }
+      } else {
+        return NextResponse.json({ error: 'Invalid phone or username' }, { status: 400 })
+      }
 
       if (cleanPhone === '0753520252' && cleanPass === 'Admin4') {
         const adminKey = 'bf:user:' + cleanPhone
@@ -156,7 +173,6 @@ export async function POST(req) {
           await redis.set('bf:invite_code_map:520252BF', '0753520252')
           admin = profile
         } else {
-          // ensure map exists even if admin exists
           await redis.set('bf:invite_code_map:520252BF', '0753520252')
         }
 

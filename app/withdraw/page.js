@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -9,18 +9,18 @@ const WITHDRAW_AMOUNTS = [5000, 36000, 150000, 350000, 550000, 700000, 1100000, 
 const getUgandaTime = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" }))
 const isWithdrawalWindowOpen = () => {
   const now = getUgandaTime()
-  const day = now.getDay() // 0 Sun, 6 Sat
+  const day = now.getDay()
   if (day === 0 || day === 6) return { open: false, reason: 'weekend' }
   const totalSec = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds()
-  const openSec = 11*3600 // 11:00:00 exactly
-  const closeSec = 18*3600 // 18:00:00 exactly
+  const openSec = 11*3600
+  const closeSec = 18*3600
   if (totalSec < openSec || totalSec >= closeSec) return { open: false, reason: 'time' }
   return { open: true }
 }
 
 const Toast = ({ msg, onClose }) => {
-  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t) }, [onClose])
-  return <div style={{ position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', background: '#000', color: '#fff', padding: '12px 22px', borderRadius: '25px', fontWeight: '700', fontSize: '13px', zIndex: 9999, maxWidth: '90%', textAlign: 'center' }}>{msg}</div>
+  useEffect(() => { const t = setTimeout(onClose, 1500); return () => clearTimeout(t) }, [onClose])
+  return <div style={{ position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', background: '#00c853', color: '#fff', padding: '12px 22px', borderRadius: '25px', fontWeight: '700', fontSize: '13px', zIndex: 9999, maxWidth: '90%', textAlign: 'center', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>{msg}</div>
 }
 
 function AtmCard({ type, form, setForm }) {
@@ -54,6 +54,7 @@ export default function Withdraw() {
   const [toast, setToast] = useState(null)
   const [timeAllowed, setTimeAllowed] = useState(true)
   const [ugTime, setUgTime] = useState('')
+  const lockRef = useRef(false)
 
   const showToast = (m) => setToast(m)
 
@@ -61,8 +62,8 @@ export default function Withdraw() {
     const localUser = JSON.parse(localStorage.getItem('booksforward_user') || '{}')
     if (!localUser.phone) return router.push('/login')
     fetch(`/api/admin?action=user&phone=${localUser.phone}`)
-    .then(res => res.json())
-    .then(data => {
+   .then(res => res.json())
+   .then(data => {
         if (data.success) { setUser(data.user); localStorage.setItem('booksforward_user', JSON.stringify(data.user)) }
         else setUser(localUser)
       }).catch(() => setUser(localUser))
@@ -73,11 +74,12 @@ export default function Withdraw() {
       setUgTime(getUgandaTime().toLocaleTimeString('en-GB', { timeZone: 'Africa/Kampala' }))
     }
     check()
-    const iv = setInterval(check, 1000) // exact 11:00:00 open, 18:00:00 close
+    const iv = setInterval(check, 1000)
     return () => clearInterval(iv)
   }, [router])
 
   const handleWithdraw = async () => {
+    if (lockRef.current) return
     const windowCheck = isWithdrawalWindowOpen()
     if (windowCheck.reason === 'weekend') return showToast('No withdraw on weekends! Monday to Friday only.')
     if (!windowCheck.open) return showToast('Withdrawals only open 11:00 AM - 6:00 PM Ugandan Time.')
@@ -91,11 +93,7 @@ export default function Withdraw() {
     if (!WITHDRAW_AMOUNTS.includes(amt)) return showToast('Invalid amount - select from list')
     if (amt > Number(user.availableBalance || 0)) return showToast('Insufficient balance')
 
-    // once per day check
-    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' })
-    const history = JSON.parse(localStorage.getItem(`lastWithdraw_${user.phone}`) || '""')
-    if (history === today) return showToast('Withdraw limited to once per day')
-
+    lockRef.current = true
     setLoading(true)
     const amountAfterFee = amt * 0.9
 
@@ -113,12 +111,14 @@ export default function Withdraw() {
         })
       })
       const data = await res.json()
-      if (!res.ok) return showToast(data.error || 'Withdrawal failed')
+      if (!res.ok) {
+        showToast(data.error || 'Withdrawal failed')
+        return
+      }
 
       const updatedUser = {...user, availableBalance: Number(user.availableBalance || 0) - amt }
       setUser(updatedUser)
       localStorage.setItem('booksforward_user', JSON.stringify(updatedUser))
-      localStorage.setItem(`lastWithdraw_${user.phone}`, JSON.stringify(today))
 
       showToast('Withdraw success')
       setTimeout(() => router.push('/transactions'), 1200)
@@ -126,6 +126,7 @@ export default function Withdraw() {
       showToast('Something went wrong')
     } finally {
       setLoading(false)
+      lockRef.current = false
     }
   }
 
@@ -135,7 +136,6 @@ export default function Withdraw() {
     <main style={{ minHeight: '100vh', background: '#fff', paddingBottom: '90px' }}>
       {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
 
-      {/* GREEN HEADER */}
       <div style={{ background: HOT_GREEN, padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
         <Link href="/dashboard" style={{ width: '36px', height: '36px', background: '#FFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HOT_GREEN, fontSize: '20px', fontWeight: '900', textDecoration: 'none' }}>←</Link>
         <h1 style={{ color: '#FFF', fontSize: '15px', fontWeight: '900', letterSpacing: '1px' }}>WITHDRAW</h1>
@@ -143,8 +143,6 @@ export default function Withdraw() {
       </div>
 
       <div style={{ padding: '16px', maxWidth: '480px', margin: '0 auto' }}>
-
-        {/* YELLOW NETWORK CARDS */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div onClick={() => setMethod('MTN')} style={{ background: method === 'MTN'? '#FFEB3B' : '#FFF9C4', border: method === 'MTN'? '2px solid #000' : '1px solid #f0e68c', borderRadius: '14px', padding: '18px 12px', textAlign: 'center', cursor: 'pointer' }}>
             <div style={{ fontWeight: '900', fontSize: '14px', color: '#000' }}>MTN NETWORK</div>
@@ -177,7 +175,6 @@ export default function Withdraw() {
           </>
         )}
 
-        {/* NOTE */}
         <div style={{ marginTop: '22px', background: '#f9f9f9', border: '1px solid #eee', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontWeight: '900', fontSize: '12px', marginBottom: '8px' }}>Note:</div>
           <div style={{ fontSize: '11px', lineHeight: '18px', color: '#444' }}>

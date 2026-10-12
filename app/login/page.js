@@ -7,7 +7,8 @@ export default function Login() {
   const lockRef = useRef(false) 
   const [toast, setToast] = useState(null)
 
-  const [form, setForm] = useState({ phone: '', password: '' })
+  const [loginMode, setLoginMode] = useState('phone') // 'phone' | 'username'
+  const [form, setForm] = useState({ phone: '', username: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
 
   const HOT_GREEN = '#00C853'
@@ -27,11 +28,20 @@ export default function Login() {
     if (lockRef.current) return
     lockRef.current = true
 
-    if (!/^07\d{8}$/.test(form.phone)) {
-      showToast('Phone must start with 07 and be 10 digits')
-      lockRef.current = false
-      return
+    if (loginMode === 'phone') {
+      if (!/^07\d{8}$/.test(form.phone)) {
+        showToast('Phone must start with 07 and be 10 digits')
+        lockRef.current = false
+        return
+      }
+    } else {
+      if (!form.username.trim() || form.username.trim().length < 3) {
+        showToast('Enter valid username (min 3 chars)')
+        lockRef.current = false
+        return
+      }
     }
+
     if (!form.password) {
       showToast('Enter your password')
       lockRef.current = false
@@ -44,7 +54,8 @@ export default function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           action: 'login', 
-          phone: form.phone,
+          phone: loginMode === 'phone' ? form.phone : undefined,
+          username: loginMode === 'username' ? form.username.trim() : undefined,
           password: form.password 
         })
       })
@@ -92,6 +103,18 @@ export default function Login() {
     boxSizing: 'border-box'
   }
 
+  const tabStyle = (active) => ({
+    flex: 1,
+    height: '40px',
+    borderRadius: '8px',
+    border: active ? `2px solid ${HOT_GREEN}` : '1px solid #d1d5db',
+    background: active ? `${HOT_GREEN}15` : '#fff',
+    color: active ? HOT_GREEN : '#666',
+    fontWeight: '800',
+    fontSize: '14px',
+    cursor: 'pointer'
+  })
+
   return (
     <div style={{ minHeight: '100vh', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative' }}>
       
@@ -119,21 +142,42 @@ export default function Login() {
       )}
 
       <div style={{ width: '100%', maxWidth: '380px', background:'#FFFFFF' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '900', textAlign: 'center', marginBottom: '24px', color: '#000' }}>Login</h1>
+        <h1 style={{ fontSize: '28px', fontWeight: '900', textAlign: 'center', marginBottom: '16px', color: '#000' }}>Login</h1>
         
+        {/* TOGGLE */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', background: '#f3f4f6', padding: '4px', borderRadius: '10px' }}>
+          <button type="button" onClick={() => setLoginMode('phone')} style={tabStyle(loginMode==='phone')}>📱 Phone</button>
+          <button type="button" onClick={() => setLoginMode('username')} style={tabStyle(loginMode==='username')}>👤 Username</button>
+        </div>
+
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <label style={{ fontSize: '15px', color: '#000', display: 'block', marginBottom: '6px', fontWeight: '700' }}>Phone Number</label>
-            <input
-              type="tel"
-              placeholder="07XXXXXXXX"
-              value={form.phone}
-              onChange={(e) => handlePhoneChange(e.target.value)}
-              maxLength={10}
-              style={inputStyle}
-              required
-            />
-          </div>
+          
+          {loginMode === 'phone' ? (
+            <div>
+              <label style={{ fontSize: '15px', color: '#000', display: 'block', marginBottom: '6px', fontWeight: '700' }}>Phone Number</label>
+              <input
+                type="tel"
+                placeholder="07XXXXXXXX"
+                value={form.phone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                maxLength={10}
+                style={inputStyle}
+                required
+              />
+            </div>
+          ) : (
+            <div>
+              <label style={{ fontSize: '15px', color: '#000', display: 'block', marginBottom: '6px', fontWeight: '700' }}>Username</label>
+              <input
+                type="text"
+                placeholder="Enter your username"
+                value={form.username}
+                onChange={(e) => setForm(prev => ({ ...prev, username: e.target.value }))}
+                style={inputStyle}
+                required
+              />
+            </div>
+          )}
 
           <div>
             <label style={{ fontSize: '15px', color: '#000', display: 'block', marginBottom: '6px', fontWeight: '700' }}>Password</label>

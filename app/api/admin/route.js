@@ -89,7 +89,6 @@ export async function POST(req) {
     if (action === 'updateStatus') {
       if(!id) return NextResponse.json({ success: false, error: 'Missing id' }, { status: 400 })
 
-      // LOCK 10s - stops double tap creating double history
       const lockKey = `${P}lock:tx:${id}`
       const gotLock = await redis.set(lockKey, '1', { nx: true, ex: 15 })
       if(!gotLock) return NextResponse.json({ success: false, error: 'Processing, please wait' }, { status: 429 })
@@ -142,11 +141,12 @@ export async function POST(req) {
         for(const s of hFiltered.reverse()) await redis.lpush(hKey, s)
         await redis.lpush(hKey, updatedTxString)
 
-        // BALANCE + ADMIN HISTORY - only if not already in admin history
+        // === ONLY ADMIN SIDE FIXED - NO DOUBLE IN DEPOSIT/WITHDRAW HISTORY ===
         const today = getUgDate()
         const histKey = tx.type === 'deposit'? `${P}admin:deposit_history:${today}` : `${P}admin:withdraw_history:${today}`
-        const existing = (await redis.lrange(histKey, 0, 99)).map(parse)
-        const alreadyExists = existing.some(t=>t?.id===id)
+        const adminRaw = await redis.lrange(histKey, 0, 200) || []
+        const alreadyExists = adminRaw.some(x => parse(x)?.id === id)
+        const adminFiltered = adminRaw.filter(x => parse(x)?.id!== id)
 
         if(!alreadyExists){
           const amt = +String(tx.amount || 0).replace(/,/g, '')
@@ -156,9 +156,13 @@ export async function POST(req) {
           if (finalStatus === 'failed' && tx.type === 'withdraw') {
             await redis.hincrbyfloat(`${P}user:${p}`, 'availableBalance', Math.round(amt / 0.9))
           }
-          await redis.lpush(histKey, updatedTxString)
-          await redis.expire(histKey, 86400)
         }
+
+        await redis.del(histKey)
+        for(const s of adminFiltered.reverse()) await redis.lpush(histKey, s)
+        await redis.lpush(histKey, updatedTxString)
+        await redis.expire(histKey, 86400)
+        // === END FIX ===
 
         await redis.lrem(`${P}pending_tx`, 0, id)
         await redis.hdel(`${P}tx:lookup`, id)
