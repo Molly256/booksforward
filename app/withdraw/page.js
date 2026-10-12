@@ -7,6 +7,7 @@ const HOT_GREEN = '#00c853'
 const WITHDRAW_AMOUNTS = [5000, 36000, 150000, 350000, 550000, 700000, 1100000, 3000000]
 
 const getUgandaTime = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" }))
+const getUgandaDateStr = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' })
 const isWithdrawalWindowOpen = () => {
   const now = getUgandaTime()
   const day = now.getDay()
@@ -62,8 +63,8 @@ export default function Withdraw() {
     const localUser = JSON.parse(localStorage.getItem('booksforward_user') || '{}')
     if (!localUser.phone) return router.push('/login')
     fetch(`/api/admin?action=user&phone=${localUser.phone}`)
-   .then(res => res.json())
-   .then(data => {
+  .then(res => res.json())
+  .then(data => {
         if (data.success) { setUser(data.user); localStorage.setItem('booksforward_user', JSON.stringify(data.user)) }
         else setUser(localUser)
       }).catch(() => setUser(localUser))
@@ -95,9 +96,29 @@ export default function Withdraw() {
 
     lockRef.current = true
     setLoading(true)
-    const amountAfterFee = amt * 0.9
 
     try {
+      // --- FRONT RULE: check real history ---
+      const todayStr = getUgandaDateStr()
+      const histRes = await fetch(`/api/transactions?phone=${user.phone}`)
+      const histData = await histRes.json()
+      if (histData.success && histData.transactions) {
+        const hasSuccessToday = histData.transactions.some(tx => {
+          if (String(tx.type).toLowerCase()!== 'withdraw') return false
+          const txDate = String(tx.createdAt || tx.timestamp || '').slice(0,10)
+          if (txDate!== todayStr) return false
+          const st = String(tx.status || '').toLowerCase()
+          return st === 'success' || st === 'completed' || st === 'pending'
+        })
+        if (hasSuccessToday) {
+          showToast('You already have a successful withdrawal today. Once per day only.')
+          return
+        }
+      }
+      // --- END FRONT RULE ---
+
+      const amountAfterFee = amt * 0.9
+
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
