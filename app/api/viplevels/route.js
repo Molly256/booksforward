@@ -35,12 +35,12 @@ function pickRandomBooks(count){
 const getUgandaDateString=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Kampala'});
 const getUgandaDateTimeString=()=>new Date().toLocaleString("en-CA",{timeZone:"Africa/Kampala",hour12:false}).slice(0,16).replace(',',' ');
 function getUgandaDay(){
-  // 0 = Sunday, 1-6 = Mon-Sat (Uganda time)
   return new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" })).getDay();
 }
-function assignBooksToUser(phone,vipLevel,today,pipeline){
+function assignBooksToUser(phone,vipLevel,today,pipeline,countOverride=null){
   const selectedVip=VIPS[vipLevel];
-  const validBooks=pickRandomBooks(selectedVip.books);
+  const booksToAssign = countOverride!== null? countOverride : selectedVip.books;
+  const validBooks=pickRandomBooks(booksToAssign);
   if(!validBooks.length) return {unlockedBooks:[],assignedBooksMeta:[]};
   validBooks.forEach(b=>{
     const id=String(b.bookId || b.id || b._id);
@@ -75,7 +75,6 @@ export async function POST(req){
 
     const pipeline=redis.pipeline();let unlockedBooksArr=[],assignedBooksMetaArr=[];
     if(vipLevel===0){
-      // VIP0 - ALWAYS SEED EVEN ON SUNDAY - NO LIMIT
       if(user.vipActivated==='true'||user.vipActivated===true) return NextResponse.json({success:false,message:'Vip0 already activated'},{status:400});
       if(Number(user.vip||0)>0&&(user.hasBoughtVip==='true'||user.hasBoughtVip===true)) return NextResponse.json({success:false,message:"Can't downgrade"},{status:400});
       const assignResult=assignBooksToUser(phone,0,dateStr,pipeline);
@@ -91,35 +90,104 @@ export async function POST(req){
       const userBalance=Number(user.availableBalance||user.balance||0),tierCost=VIPS[vipLevel].price;
       if(userBalance<tierCost) return NextResponse.json({success:false,message:'Insufficient balance to upgrade'},{status:400});
       const isFirst=user.hasBoughtVip!=='true'&&user.hasBoughtVip!==true;
+
+      // === REFUND LOGIC ===
+      const oldPricePaid = Number(user.vipPricePaid || VIPS[currentVip]?.price || 0);
+      const hasPreviousPaidVip = currentVip > 0 && oldPricePaid > 0;
+
       pipeline.hincrby(userKey,'availableBalance',-tierCost);
       if(user.balance) pipeline.hincrby(userKey,'balance',-tierCost);
 
-      if(isSunday){
-        // SUNDAY - VIP 1-4 UPGRADE: NO BOOK SEEDING
-        console.log(`⛔ Sunday Uganda - VIP${vipLevel} upgrade for ${phone} - NO books seeded`);
-        unlockedBooksArr=[];
-        assignedBooksMetaArr=[];
+      // === NEW BOOK SEEDING LOGIC FOR VIP2-VIP4 ===
+      let isLeftoverUpgrade = false;
+      if(vipLevel >= 2 && currentVip >= 1){
+        // check today's progress
+        const oldVipBooks = VIPS[currentVip]?.books || 0;
+        const newVipBooks = VIPS[vipLevel].books;
+        const booksReadToday = Number(user.books_read_today || 0);
+
+        if(isSunday){
+          console.log(`⛔ Sunday Uganda - VIP${vipLevel} upgrade for ${phone} - NO books seeded`);
+          unlockedBooksArr=[]; assignedBooksMetaArr=[];
+        }else if(booksReadToday >= oldVipBooks && oldVipBooks > 0){
+          // NO PENDING - finished lower vip today -> seed only leftover
+          const leftover = Math.max(0, newVipBooks - oldVipBooks);
+          console.log(`✅ Leftover upgrade: VIP${currentVip} ${booksReadToday}/${oldVipBooks} done -> VIP${vipLevel} seeding only ${leftover} books`);
+          if(leftover > 0){
+            const assignResult=assignBooksToUser(phone,vipLevel,dateStr,pipeline,leftover);
+            unlockedBooksArr=assignResult.unlockedBooks; assignedBooksMetaArr=assignResult.assignedBooksMeta;
+          }else{
+            unlockedBooksArr=[]; assignedBooksMetaArr=[];
+          }
+          isLeftoverUpgrade = true;
+        }else{
+          // HAS PENDING - still has books from lower vip -> seed FULL new vip count (replace old pending)
+          console.log(`🔄 Full upgrade: VIP${currentVip} has pending ${oldVipBooks - booksReadToday} -> VIP${vipLevel} seeding full ${newVipBooks}`);
+          try{
+            const existingIds = await redis.smembers(P+'books:'+phone+':'+dateStr);
+            if(existingIds && existingIds.length){
+              for(const bid of existingIds){
+                pipeline.del(P+'book:'+phone+':'+dateStr+':'+bid);
+              }
+              pipeline.del(P+'books:'+phone+':'+dateStr);
+            }
+          }catch(e){ console.log('cleanup error', e); }
+          const assignResult=assignBooksToUser(phone,vipLevel,dateStr,pipeline);
+          unlockedBooksArr=assignResult.unlockedBooks; assignedBooksMetaArr=assignResult.assignedBooksMeta;
+        }
       }else{
-        // MON-SAT: SEED BOOKS NORMALLY
-        const assignResult=assignBooksToUser(phone,vipLevel,dateStr,pipeline);
-        unlockedBooksArr=assignResult.unlockedBooks;assignedBooksMetaArr=assignResult.assignedBooksMeta;
+        // VIP0->VIP1 or VIP1 upgrade - always full (except Sunday)
+        if(isSunday){
+          console.log(`⛔ Sunday Uganda - VIP${vipLevel} upgrade for ${phone} - NO books seeded`);
+          unlockedBooksArr=[]; assignedBooksMetaArr=[];
+        }else{
+          const assignResult=assignBooksToUser(phone,vipLevel,dateStr,pipeline);
+          unlockedBooksArr=assignResult.unlockedBooks; assignedBooksMetaArr=assignResult.assignedBooksMeta;
+        }
       }
 
       pipeline.lpush(historyKey,JSON.stringify({id:'up_'+Date.now(),type:'upgrade_vip',amount:String(-tierCost),note:'Vip'+vipLevel+' Upgrade',status:'success',createdAt:timeStr}));
+
+      if(hasPreviousPaidVip){
+        pipeline.hincrby(userKey,'availableBalance',oldPricePaid);
+        if(user.balance) pipeline.hincrby(userKey,'balance',oldPricePaid);
+        pipeline.lpush(historyKey,JSON.stringify({id:'refund_'+Date.now(),type:'refund',label:'refund',subType:'vip_refund',amount:String(oldPricePaid),note:`Refund for VIP${currentVip} (${oldPricePaid} UGX) - Upgrade to VIP${vipLevel}`,status:'success',createdAt:timeStr}));
+      }
+
       pipeline.hincrby(userKey,'spins',1);
-      pipeline.hset(userKey,{
-        vip:String(vipLevel),
-        vipPricePaid:String(tierCost),
-        hasBoughtVip:'true',
-        vipActivated:'true',
-        vipExpiry:new Date(Date.now()+31536000000).toISOString(),
-        unlockedBooks:JSON.stringify(unlockedBooksArr),
-        completedBooks:'[]',
-        books_read_today:'0',
-        dailyIncome:'0',
-        lastResetDate:dateStr,
-        vip_bought_date:dateStr
-      });
+
+      if(isLeftoverUpgrade){
+        // LEFTOVER CASE: keep completedBooks and books_read_today, only add new pending
+        const existingCompleted = user.completedBooks || '[]';
+        pipeline.hset(userKey,{
+          vip:String(vipLevel),
+          vipPricePaid:String(tierCost),
+          hasBoughtVip:'true',
+          vipActivated:'true',
+          vipExpiry:new Date(Date.now()+31536000000).toISOString(),
+          unlockedBooks:JSON.stringify(unlockedBooksArr),
+          // DO NOT RESET completedBooks and books_read_today for leftover fill
+          completedBooks: existingCompleted,
+          lastResetDate:dateStr,
+          vip_bought_date:dateStr
+        });
+      }else{
+        // FULL UPGRADE CASE: reset as before
+        pipeline.hset(userKey,{
+          vip:String(vipLevel),
+          vipPricePaid:String(tierCost),
+          hasBoughtVip:'true',
+          vipActivated:'true',
+          vipExpiry:new Date(Date.now()+31536000000).toISOString(),
+          unlockedBooks:JSON.stringify(unlockedBooksArr),
+          completedBooks:'[]',
+          books_read_today:'0',
+          dailyIncome:'0',
+          lastResetDate:dateStr,
+          vip_bought_date:dateStr
+        });
+      }
+
       await pipeline.exec();
       if(isFirst) await processHierarchicalCommissions(phone,vipLevel);
       const updatedUser=await redis.hgetall(userKey);
