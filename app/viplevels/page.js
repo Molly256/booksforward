@@ -20,7 +20,7 @@ const Toast = ({ msg, onClose }) => {
 
 function VipImage({ level }) {
   return (
-    <div style={{ width:150, height:200, flexShrink:0, background:'#FFF', display:'flex', alignItems:'center', justifyContent:'center' }}>
+    <div style={{ width:300, height:300, flexShrink:0, background:'#FFF', display:'flex', alignItems:'center', justifyContent:'center' }}>
       <img src={`/vip${level}.jpg`} alt="" style={{ width:'100%', height:'100%', objectFit:'contain', display:'block', mixBlendMode:'multiply' }} />
     </div>
   )
