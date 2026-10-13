@@ -82,7 +82,7 @@ export default function AboutPage() {
 
         <div style={{ background: '#111', borderRadius: '14px', padding: '18px', textAlign: 'center' }}>
           <p style={{ color: HOT_GREEN, fontSize: '16px', fontWeight: '900', marginBottom: '6px' }}>Books Forward</p>
-          <p style={{ color: '#fff', fontSize: '13px', fontWeight: '700' }}>Phone: +1(551)337-7400</p>
+          <p style={{ color: '#fff', fontSize: '13px', fontWeight: '700' }}>Phone: +447441424156</p>
         </div>
       </div>
     </main>
