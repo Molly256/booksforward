@@ -191,7 +191,7 @@ export default function Withdraw() {
             </div>
 
             <div style={{ marginTop: '12px' }}>
-              <input type="text" placeholder="e.g. 10000" value={form.amount} onChange={e => setForm({...form, amount: e.target.value.replace(/\D/g, '') })} style={{ width: '100%', border: '1px solid #e0e0e0', borderRadius: '10px', padding: '12px', fontWeight: '700', fontSize: '13px', outline: 'none' }} />
+              <input type="text" placeholder="e.g. 5000" value={form.amount} onChange={e => setForm({...form, amount: e.target.value.replace(/\D/g, '') })} style={{ width: '100%', border: '1px solid #e0e0e0', borderRadius: '10px', padding: '12px', fontWeight: '700', fontSize: '13px', outline: 'none' }} />
             </div>
           </>
         )}
@@ -199,7 +199,7 @@ export default function Withdraw() {
         <div style={{ marginTop: '22px', background: '#f9f9f9', border: '1px solid #eee', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontWeight: '900', fontSize: '12px', marginBottom: '8px' }}>Note:</div>
           <div style={{ fontSize: '11px', lineHeight: '18px', color: '#444' }}>
-            Minimum withdraw: <b>10,000ugx</b><br />
+            Minimum withdraw: <b>5000ugx</b><br />
             Transaction fee: <b>10%</b><br />
             Withdraw days : <b>Monday to Friday.</b><br />
             Withdraw time: <b>11:00am to 6:00pm.</b><br />
