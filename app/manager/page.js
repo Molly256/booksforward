@@ -2,7 +2,7 @@
 
 export default function ManagerPage() {
   const managers = [
-    { name: "Jenn Vance", phone: "447441424156" }
+    { name: "Jenn Vance", phone: "447441427911" }
   ]
 
   const getWaLink = (phone) => `https://wa.me/${phone}?text=${encodeURIComponent('hello 👋 manager Jenn Vance')}`
