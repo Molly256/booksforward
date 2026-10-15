@@ -9,7 +9,7 @@ export default function RootLayout({ children }) {
   const pathname = usePathname()
 
   const hideNavPages = ['/', '/register', '/login']
-  const shouldHideNav = hideNavPages.includes(pathname)
+  const shouldHideNav = hideNavPages.includes(pathname) || pathname?.startsWith('/r')
 
   return (
     <html lang="en">

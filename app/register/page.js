@@ -195,7 +195,7 @@ export default function Register() {
 
           <div>
             <label style={{ fontSize: '15px', color: '#000', display: 'block', marginBottom: '6px', fontWeight: '700' }}>
-              Invite Code {isLocked && <span style={{color:HOT_GREEN, fontSize:'12px'}}> From {form.inviterCode}</span>}
+              Invite Code
             </label>
             <input
               type="text"
