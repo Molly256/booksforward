@@ -9,31 +9,30 @@ export default function ReferralRedirect() {
   const [status, setStatus] = useState('validating')
 
   const isValidInviteCode = (code) => {
-    return /^PM\d{6}$/.test(code)
+    return /^\d{6}BF$/.test(code) // CHANGED: 6 digits + BF like 185973BF
   }
 
   useEffect(() => {
     if (!code) {
-      router.push('/') // <- Changed: Redirect to homepage if no code
+      router.push('/')
       return
     }
 
     if (!isValidInviteCode(code)) {
       setStatus('invalid')
-      setTimeout(() => router.push('/'), 1500) // <- Changed: Redirect to homepage if invalid
+      setTimeout(() => router.push('/'), 1500)
       return
     }
 
-    // Save inviter code for Register page to read
     try {
-      localStorage.setItem('referrer_code', code) // <- Sara's PM530252
-      sessionStorage.setItem('referrer_code', code) // Safari backup
+      localStorage.setItem('referrer_code', code)
+      sessionStorage.setItem('referrer_code', code)
       setStatus('success')
       
-      setTimeout(() => router.push('/'), 300) // <- Changed: Connect to homepage on success
+      setTimeout(() => router.push('/'), 300)
     } catch (err) {
       console.error('Storage failed:', err)
-      router.push('/') // <- Changed: Redirect to homepage if storage fails
+      router.push('/')
     }
   }, [code, router])
 
