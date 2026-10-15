@@ -36,7 +36,7 @@ export default function InvitePage() {
   if (!user) return <div className="p-4 text-black">Loading...</div>
 
   const inviteCode = user?.inviteCode || user?.invite_code || user?.myInviteCode || '------'
-  const inviteLink = `${BASE_URL}/?code=${inviteCode}`
+  const inviteLink = `${BASE_URL}/r/${inviteCode}`
 
   const handleCopy = async (text) => {
     try {
