@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 const HOT_GREEN = '#00c853'
-const WITHDRAW_AMOUNTS = [5000, 36000, 150000, 350000, 550000, 700000, 1100000, 3000000]
+const WITHDRAW_AMOUNTS = [5000, 10000, 50000, 150000, 350000, 550000, 700000, 1100000, 3000000]
 
 const getUgandaTime = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Kampala" }))
 const getUgandaDateStr = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Kampala' })
